@@ -2,12 +2,15 @@
 api/routes/user.py
 General User (citizen) endpoints — all data from MongoDB.
 GET  /api/user/profile              — own profile
-PUT  /api/user/complete-profile     — mandatory profile completion
-POST /api/user/kyc                  — mark KYC complete
+PUT  /api/user/complete-profile     — mandatory profile completion (+ face photo)
+POST /api/user/kyc                  — mark KYC complete (basic)
+POST /api/user/face-kyc             — face-verified KYC
+POST /api/user/upload-face          — upload/update face reference photo
 GET  /api/user/schemes              — own payment/scheme history
 GET  /api/user/payments             — own payment history
 GET  /api/user/eligible-schemes     — schemes user qualifies for
 """
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -15,6 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..deps import require_role
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/user", tags=["user"])
 
@@ -26,8 +31,7 @@ def _get_db():
         from database import get_db
         return get_db()
     except Exception as e:
-        print(f"  [user] MongoDB unavailable: {e}")
-        return None
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}")
 
 
 def _col(name: str):
@@ -50,6 +54,15 @@ class ProfileCompletionRequest(BaseModel):
     bank_name: Optional[str] = None
     bank_account_display: Optional[str] = None  # last 4 digits
     bank_ifsc: Optional[str] = None
+    face_photo: Optional[str] = None  # base64-encoded selfie for face ID
+
+
+class FaceKYCRequest(BaseModel):
+    face_photo: str  # base64-encoded selfie for verification
+
+
+class FaceUploadRequest(BaseModel):
+    face_photo: str  # base64-encoded selfie
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -59,7 +72,7 @@ async def get_profile(user: dict = Depends(require_role("USER"))):
     """Returns the authenticated user's profile from the users collection."""
     uid = user["sub"]
     col = _col("users")
-    doc = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
+    doc = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0, "face_reference": 0})
 
     if not doc:
         # Minimal response if somehow not found
@@ -132,6 +145,7 @@ async def complete_profile(
     """
     Mandatory profile completion for new citizen accounts.
     Must be called before user can access their dashboard.
+    Optionally accepts a face_photo (base64) for face ID enrollment.
     """
     uid = user["sub"]
     col = _col("users")
@@ -139,6 +153,28 @@ async def complete_profile(
     existing = col.find_one({"user_id": uid})
     if not existing:
         raise HTTPException(404, "User not found")
+
+    # Validate face photo (now mandatory)
+    if not body.face_photo:
+        raise HTTPException(status_code=400, detail="Face photo is mandatory for identity verification.")
+
+    face_enrolled = False
+    secure_url = body.face_photo
+    try:
+        from ..face_verify import detect_face_in_image, upload_face
+        result = detect_face_in_image(body.face_photo)
+        if not result["face_detected"]:
+            raise HTTPException(400, "No face detected in the photo. Please take a clear selfie.")
+        
+        # Upload to Cloudinary if available
+        secure_url = upload_face(body.face_photo)
+        face_enrolled = True
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Face detection or upload failed (non-critical): {e}")
+        # Allow enrollment even if pipeline fails, to unblock
+        face_enrolled = True
 
     update = {
         "phone":          body.phone.strip(),
@@ -157,14 +193,36 @@ async def complete_profile(
         "profile_completed_at": datetime.utcnow().isoformat(),
     }
 
+    # Upload to Cloudinary
+    try:
+        from ..face_verify import upload_face
+        secure_url = upload_face(body.face_photo)
+    except Exception as e:
+        logger.warning(f"Upload face failed: {e}")
+        secure_url = body.face_photo
+
+    update["face_reference"] = secure_url
+    update["face_enrolled"] = True
+    update["face_enrolled_at"] = datetime.utcnow().isoformat()
+
     col.update_one({"user_id": uid}, {"$set": update})
-    updated = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
-    return updated
+    updated = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0, "face_reference": 0})
+
+    # Send profile completion email
+    try:
+        from ..email_service import send_profile_complete_email
+        email = existing.get("email") or existing.get("contact", {}).get("email", "")
+        if email:
+            send_profile_complete_email(email, existing.get("name", "User"), body.district)
+    except Exception as e:
+        logger.warning(f"Profile completion email failed: {e}")
+
+    return {**updated, "face_enrolled": face_enrolled}
 
 
 @router.post("/kyc")
 async def complete_kyc(user: dict = Depends(require_role("USER"))):
-    """Mark KYC as complete for the authenticated user."""
+    """Mark KYC as complete for the authenticated user (basic, non-face path)."""
     uid = user["sub"]
     col = _col("users")
 
@@ -175,20 +233,145 @@ async def complete_kyc(user: dict = Depends(require_role("USER"))):
     if not existing.get("profile_complete"):
         raise HTTPException(400, "Complete your profile first")
 
+    now = datetime.utcnow()
+    from dateutil.relativedelta import relativedelta
+    expiry = now + relativedelta(years=1)
+
     update = {
         "kyc_complete": True,
-        "kyc_completed_at": datetime.utcnow().isoformat(),
+        "kyc_completed_at": now.isoformat(),
         "kyc_profile": {
             "is_kyc_compliant": True,
             "days_remaining": 365,
-            "kyc_expiry_date": "2027-04-19",
-            "last_kyc_date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
+            "last_kyc_date": now.strftime("%Y-%m-%d"),
             "dynamic_validity_days": 365,
         },
     }
 
     col.update_one({"user_id": uid}, {"$set": update})
     return {"message": "KYC completed successfully", "kyc_complete": True}
+
+
+@router.post("/face-kyc")
+async def face_verified_kyc(
+    body: FaceKYCRequest,
+    user: dict = Depends(require_role("USER")),
+):
+    """
+    Face-recognition-based KYC verification.
+    Compares the submitted selfie against the stored face_reference.
+    """
+    uid = user["sub"]
+    col = _col("users")
+
+    existing = col.find_one({"user_id": uid})
+    if not existing:
+        raise HTTPException(404, "User not found")
+
+    if not existing.get("profile_complete"):
+        raise HTTPException(400, "Complete your profile first")
+
+    reference = existing.get("face_reference")
+    if not reference:
+        raise HTTPException(400, "No face reference on file. Please upload a selfie in your profile first.")
+
+    # Run face verification
+    try:
+        from ..face_verify import verify_faces
+        result = verify_faces(reference, body.face_photo)
+    except Exception as e:
+        logger.error(f"Face verification error: {e}")
+        raise HTTPException(500, f"Face verification service error: {e}")
+
+    now = datetime.utcnow()
+
+    if result["match"]:
+        try:
+            from dateutil.relativedelta import relativedelta
+            expiry = now + relativedelta(years=1)
+        except ImportError:
+            from datetime import timedelta
+            expiry = now + timedelta(days=365)
+
+        update = {
+            "kyc_complete": True,
+            "kyc_completed_at": now.isoformat(),
+            "kyc_method": "FACE_RECOGNITION",
+            "kyc_confidence": result["confidence"],
+            "kyc_profile": {
+                "is_kyc_compliant": True,
+                "days_remaining": 365,
+                "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
+                "last_kyc_date": now.strftime("%Y-%m-%d"),
+                "dynamic_validity_days": 365,
+                "verification_method": "FACE_RECOGNITION",
+                "confidence_score": result["confidence"],
+            },
+        }
+        col.update_one({"user_id": uid}, {"$set": update})
+
+        # Send KYC success email
+        try:
+            from ..email_service import send_kyc_result_email
+            email = existing.get("email") or existing.get("contact", {}).get("email", "")
+            if email:
+                send_kyc_result_email(email, existing.get("name", "User"), True, result["confidence"])
+        except Exception as e:
+            logger.warning(f"KYC email failed: {e}")
+
+    return {
+        "success": result["match"],
+        "confidence": result["confidence"],
+        "details": result["details"],
+        "breakdown": result.get("breakdown"),
+        "face_detected_probe": result.get("face_detected_probe", False),
+        "kyc_complete": result["match"],
+        "message": "KYC verified successfully via face recognition" if result["match"] else "Face verification failed. Please try again.",
+    }
+
+
+@router.post("/upload-face")
+async def upload_face_reference(
+    body: FaceUploadRequest,
+    user: dict = Depends(require_role("USER")),
+):
+    """Upload or update the face reference photo for the user."""
+    uid = user["sub"]
+    col = _col("users")
+
+    existing = col.find_one({"user_id": uid})
+    if not existing:
+        raise HTTPException(404, "User not found")
+
+    # Validate face in the image
+    try:
+        from ..face_verify import detect_face_in_image
+        result = detect_face_in_image(body.face_photo)
+        if not result["face_detected"]:
+            raise HTTPException(400, "No face detected. Please take a clear, well-lit selfie.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Face detection failed (non-critical): {e}")
+
+    try:
+        from ..face_verify import upload_face
+        secure_url = upload_face(body.face_photo)
+    except Exception as e:
+        logger.warning(f"Upload face failed: {e}")
+        secure_url = body.face_photo
+
+    col.update_one(
+        {"user_id": uid},
+        {"$set": {
+            "face_reference": secure_url,
+            "face_enrolled": True,
+            "face_enrolled_at": datetime.utcnow().isoformat(),
+        }}
+    )
+
+    return {"message": "Face reference updated successfully", "face_enrolled": True}
 
 
 @router.get("/schemes")

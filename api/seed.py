@@ -121,6 +121,7 @@ async def seed_officers(db):
     """
     Called once at startup. Inserts each demo officer into MongoDB
     (with hashed password) if they don't already exist.
+    Also refreshes password hashes to ensure native bcrypt format.
     """
     if db is None:
         return
@@ -132,4 +133,9 @@ async def seed_officers(db):
             doc["password_hash"] = hash_password(officer["plain_password"])
             col.insert_one(doc)
             print(f"  [seed] Created officer: {officer['email']} ({officer['role']})")
-        # else: skip — already exists
+        else:
+            # Refresh password hash to native bcrypt format (fixes passlib->bcrypt migration)
+            col.update_one(
+                {"officer_id": officer["officer_id"]},
+                {"$set": {"password_hash": hash_password(officer["plain_password"])}}
+            )

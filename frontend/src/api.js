@@ -282,6 +282,16 @@ export async function completeKYC() {
   return res.data
 }
 
+export async function faceVerifyKYC(facePhoto) {
+  const res = await client.post('/api/user/face-kyc', { face_photo: facePhoto })
+  return res.data
+}
+
+export async function uploadFaceReference(facePhoto) {
+  const res = await client.post('/api/user/upload-face', { face_photo: facePhoto })
+  return res.data
+}
+
 export async function getUserSchemes() {
   return safe(() => client.get('/api/user/schemes'), { count: 0, schemes: [] })
 }

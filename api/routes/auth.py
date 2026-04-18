@@ -1,11 +1,11 @@
 """
 api/routes/auth.py
 Authentication endpoints:
-  POST /api/auth/login          — officer or user login
-  POST /api/auth/register       — citizen registration (aadhaar-based)
-  POST /api/auth/logout         — stateless (client deletes token)
-  GET  /api/auth/me             — validate token
-  GET  /api/auth/geography      — districts + talukas for dropdowns
+  POST /api/auth/login        — officer or user login
+  POST /api/auth/register     — citizen registration (aadhaar-based)
+  POST /api/auth/logout       — stateless (client deletes token)
+  GET  /api/auth/me           — validate token
+  GET  /api/auth/geography    — districts + talukas for dropdowns
 """
 from datetime import datetime
 from typing import Optional
@@ -26,8 +26,11 @@ def _get_db():
     try:
         from database import get_db
         return get_db()
-    except Exception:
-        return None
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail=f"Database unavailable: {exc}"
+        ) from exc
 
 
 # ── Request schemas ───────────────────────────────────────────────────────────

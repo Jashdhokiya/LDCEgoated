@@ -24,6 +24,9 @@ from ..deps import require_role
 
 router = APIRouter(tags=["analysis"])
 
+# In-memory fallback flag store (used by audit.py and admin.py when DB is down)
+_flag_store: dict = {}
+
 
 def _load_detectors():
     from detectors.cross_scheme_detector import detect_cross_scheme
@@ -142,6 +145,11 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
     col.delete_many({})
     if enriched:
         col.insert_many([{k: v for k, v in f.items() if k != "_id"} for f in enriched])
+
+    # Populate in-memory fallback store
+    _flag_store.clear()
+    for f in enriched:
+        _flag_store[f["flag_id"]] = f
 
     elapsed = time.time() - start
 

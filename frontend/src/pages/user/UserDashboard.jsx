@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
-import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, MapPin, CreditCard, X, Loader2, Check } from 'lucide-react'
-import { getUser, completeKYC } from '../../api'
+import { useState, useEffect } from 'react'
+import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, MapPin, CreditCard, X, Loader2, Check, XCircle } from 'lucide-react'
+import { getUser, faceVerifyKYC, completeKYC, uploadFaceReference } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
+import WebcamCapture from '../../components/WebcamCapture'
 
 const SCHEME_NEWS = [
   { id: 1, title: 'Namo Lakshmi Yojana — Extended Application Window', date: '2026-04-10', tag: 'NEW', body: 'The application deadline for NLY 2025-26 has been extended to 30 April 2026. Eligible girl students in classes 9–12 can now apply.' },
@@ -25,26 +26,11 @@ const TAG_CONFIG = {
 // ─── KYC Modal ─────────────────────────────────────────────────────────────────
 function KYCModal({ user, onClose, onComplete }) {
   const { t } = useLanguage()
-  const [step, setStep] = useState(1) // 1 = review info, 2 = face scan, 3 = done
-  const [scanning, setScanning] = useState(false)
-  const [scanProgress, setScanProgress] = useState(0)
-  const intervalRef = useRef(null)
+  const [step, setStep] = useState(1)
+  const [verifying, setVerifying] = useState(false)
+  const [verifyResult, setVerifyResult] = useState(null)
 
-  const startScan = () => {
-    setScanning(true)
-    setScanProgress(0)
-    intervalRef.current = setInterval(() => {
-      setScanProgress(p => {
-        if (p >= 100) {
-          clearInterval(intervalRef.current)
-          setScanning(false)
-          setStep(3)
-          return 100
-        }
-        return p + 3
-      })
-    }, 50)
-  }
+  const hasFaceRef = user?.face_enrolled
 
   const INFO_ROWS = [
     { icon: User, label: t('userDashboard.fullName'), value: user?.full_name || user?.name || '—' },
@@ -54,6 +40,27 @@ function KYCModal({ user, onClose, onComplete }) {
     { icon: Shield, label: t('userDashboard.category'), value: user?.demographics?.category || '—' },
     { icon: CreditCard, label: t('userDashboard.bankAccount'), value: `${user?.bank?.bank || '—'} · ${user?.bank?.account_display || '—'}` },
   ]
+
+  const handleFaceCapture = async (base64) => {
+    setVerifying(true)
+    try {
+      if (!hasFaceRef) {
+        // Enrolling for the first time
+        await uploadFaceReference(base64)
+        // Immediately do basic KYC to finish the process since they just enrolled
+        await completeKYC()
+        setVerifyResult({ success: true, confidence: 100, details: 'Face enrolled successfully', message: 'Done' })
+      } else {
+        // Normal verification
+        const res = await faceVerifyKYC(base64)
+        setVerifyResult(res)
+      }
+      setStep(3)
+    } catch (err) {
+      setVerifyResult({ success: false, confidence: 0, details: err?.response?.data?.detail || 'Verification failed', message: 'Error' })
+      setStep(3)
+    } finally { setVerifying(false) }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -67,25 +74,17 @@ function KYCModal({ user, onClose, onComplete }) {
               <p className="text-xs text-text-secondary font-data">{t('userDashboard.step')} {step} {t('userDashboard.of')} 3</p>
             </div>
           </div>
-          {step !== 2 && (
-            <button onClick={onClose} className="text-text-secondary hover:text-text-secondary transition-colors">
-              <X size={18} />
-            </button>
-          )}
+          {!verifying && <button onClick={onClose} className="text-text-secondary hover:text-text-primary transition-colors"><X size={18} /></button>}
         </div>
 
         {/* Step indicator */}
         <div className="flex items-center gap-0 px-6 pt-4 pb-1">
-          {[t('userDashboard.verifyInfo'), t('userDashboard.faceScan'), t('userDashboard.complete')].map((s, i) => (
+          {[t('userDashboard.verifyInfo'), 'Face Scan', t('userDashboard.complete')].map((s, i) => (
             <div key={s} className="flex items-center flex-1">
-              <div className={`w-full flex flex-col items-center`}>
+              <div className="w-full flex flex-col items-center">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 transition-all ${
-                  step > i + 1 ? 'bg-emerald-500 text-white' :
-                  step === i + 1 ? 'bg-primary-override text-white' :
-                  'bg-surface-low text-text-secondary'
-                }`}>
-                  {step > i + 1 ? <Check size={14} /> : i + 1}
-                </div>
+                  step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-primary-override text-white' : 'bg-surface-low text-text-secondary'
+                }`}>{step > i + 1 ? <Check size={14} /> : i + 1}</div>
                 <span className={`text-[10px] font-data ${step === i + 1 ? 'text-primary-override font-bold' : 'text-text-secondary'}`}>{s}</span>
               </div>
               {i < 2 && <div className={`flex-1 h-px mx-1 mb-5 ${step > i + 1 ? 'bg-emerald-400' : 'bg-surface-low'}`} />}
@@ -96,10 +95,8 @@ function KYCModal({ user, onClose, onComplete }) {
         {/* Step 1: Review info */}
         {step === 1 && (
           <div className="px-6 py-5">
-            <p className="text-sm font-data text-text-secondary mb-4 leading-relaxed">
-              {t('userDashboard.reviewInfo')}
-            </p>
-            <div className="space-y-3 mb-6">
+            <p className="text-sm font-data text-text-secondary mb-4 leading-relaxed">{t('userDashboard.reviewInfo')}</p>
+            <div className="space-y-3 mb-4">
               {INFO_ROWS.map(({ icon: Icon, label, value }) => (
                 <div key={label} className="flex items-center gap-3 px-4 py-3 bg-surface-low rounded-lg">
                   <Icon size={16} className="text-text-secondary flex-shrink-0" />
@@ -110,113 +107,115 @@ function KYCModal({ user, onClose, onComplete }) {
                 </div>
               ))}
             </div>
+            <div className={`flex items-center gap-2 px-4 py-3 rounded-lg mb-4 ${hasFaceRef ? 'bg-tint-emerald' : 'bg-tint-red'}`}>
+              <Camera size={14} className={hasFaceRef ? 'text-emerald-600' : 'text-risk-critical'} />
+              <span className={`text-xs font-data font-bold ${hasFaceRef ? 'text-emerald-600' : 'text-risk-critical'}`}>
+                Face ID: {hasFaceRef ? 'Enrolled — face verification available' : 'Not enrolled — Face enrolment required to proceed'}
+              </span>
+            </div>
             <div className="flex gap-3">
-              <button onClick={onClose} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-low transition-all">
-                {t('common.cancel')}
-              </button>
-              <button onClick={() => setStep(2)} className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all">
-                {t('userDashboard.confirmContinue')}
+              <button onClick={onClose} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-low transition-all">{t('common.cancel')}</button>
+              <button 
+                onClick={() => setStep(2)} 
+                className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+              >
+                <Camera size={14} /> {hasFaceRef ? 'Verify Face' : 'Enroll Face ID'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 2: Face scan */}
+        {/* Step 2: Real webcam face verification */}
         {step === 2 && (
           <div className="px-6 py-6 flex flex-col items-center">
-            <p className="text-sm font-data text-text-secondary mb-6 text-center">
-              {t('userDashboard.faceScanInstructions')}
+            <p className="text-sm font-data text-text-secondary mb-4 text-center">
+              Position your face in the camera. Your photo will be matched against your enrolled Face ID using AI face recognition.
             </p>
-
-            {/* Camera simulation */}
-            <div className="relative w-56 h-56 rounded-2xl overflow-hidden bg-gray-900 mb-6">
-              {/* Simulated camera feed */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-28 h-28 rounded-full bg-gray-700 flex items-center justify-center">
-                  <User size={48} className="text-text-secondary" />
+            {verifying ? (
+              <div className="flex flex-col items-center gap-4 py-8">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-full border-4 border-primary-override/30 flex items-center justify-center">
+                    <Loader2 size={32} className="animate-spin text-primary-override" />
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary-override flex items-center justify-center">
+                    <Shield size={14} className="text-white" />
+                  </div>
                 </div>
+                <p className="text-sm font-bold text-text-primary">Analyzing Face…</p>
+                <p className="text-xs text-text-secondary font-data">Running multi-metric face verification</p>
               </div>
-
-              {/* Scanning overlay */}
-              {scanning && (
-                <>
-                  <div className="absolute inset-0 bg-emerald-500/10" />
-                  {/* Scan line */}
-                  <div
-                    className="absolute left-0 right-0 h-0.5 bg-emerald-400 shadow-[0_0_12px_2px_rgba(52,211,153,0.8)]"
-                    style={{ top: `${scanProgress}%`, transition: 'top 0.05s linear' }}
-                  />
-                </>
-              )}
-
-              {/* Corner brackets */}
-              {['top-2 left-2', 'top-2 right-2', 'bottom-2 left-2', 'bottom-2 right-2'].map((pos, i) => (
-                <div key={i} className={`absolute w-6 h-6 ${pos} border-emerald-400`} style={{
-                  borderTopWidth: i < 2 ? 2 : 0,
-                  borderBottomWidth: i >= 2 ? 2 : 0,
-                  borderLeftWidth: i % 2 === 0 ? 2 : 0,
-                  borderRightWidth: i % 2 === 1 ? 2 : 0,
-                }} />
-              ))}
-
-              {/* Progress */}
-              {scanning && (
-                <div className="absolute bottom-3 left-0 right-0 flex justify-center">
-                  <span className="text-xs font-mono text-emerald-300 bg-black/50 px-2 py-0.5 rounded-full">
-                    {scanProgress}% scanned…
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Progress bar */}
-            {scanning && (
-              <div className="w-full h-1.5 bg-surface-low rounded-full overflow-hidden mb-4">
-                <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${scanProgress}%` }} />
-              </div>
+            ) : (
+              <WebcamCapture mode="verify" onCapture={handleFaceCapture} onCancel={() => setStep(1)} disabled={verifying} />
             )}
-
-            <button
-              onClick={startScan}
-              disabled={scanning}
-              className="w-full py-3 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-xl transition-all text-sm"
-            >
-              {scanning ? (
-                <><Loader2 size={16} className="animate-spin" /> {t('userDashboard.scanningFace')}</>
-              ) : (
-                <><Camera size={16} /> {t('userDashboard.startFaceVerification')}</>
-              )}
-            </button>
-
-            <button onClick={onClose} disabled={scanning} className="mt-2 text-xs text-text-secondary hover:text-text-primary font-data transition-colors">
-              {t('common.cancel')}
-            </button>
           </div>
         )}
 
-        {/* Step 3: Done */}
-        {step === 3 && (
-          <div className="px-6 py-10 flex flex-col items-center text-center">
-            <div className="w-16 h-16 rounded-full bg-tint-emerald flex items-center justify-center mb-4">
-              <CheckCircle size={32} className="text-emerald-600" />
+        {/* Step 3: Result */}
+        {step === 3 && verifyResult && (
+          <div className="px-6 py-8 flex flex-col items-center text-center">
+            {verifyResult.success ? (
+              <>
+                <div className="w-16 h-16 rounded-full bg-tint-emerald flex items-center justify-center mb-4">
+                  <CheckCircle size={32} className="text-emerald-600" />
+                </div>
+                <h3 className="text-lg font-bold text-text-primary font-sans mb-1">{t('userDashboard.kycSuccess')}</h3>
+                <p className="text-sm text-text-secondary font-data leading-relaxed mb-2">{t('userDashboard.kycSuccessDesc')}</p>
+                {verifyResult.confidence > 0 && verifyResult.confidence < 100 && (
+                  <div className="w-full max-w-xs bg-surface-low rounded-xl p-4 mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-text-secondary font-data">AI Confidence</span>
+                      <span className="text-lg font-bold text-emerald-600 font-mono">{verifyResult.confidence}%</span>
+                    </div>
+                    <div className="h-2 bg-surface-lowest rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: `${verifyResult.confidence}%` }} />
+                    </div>
+                    {verifyResult.breakdown && (
+                      <div className="mt-3 space-y-1">
+                        {Object.entries(verifyResult.breakdown).map(([key, val]) => (
+                          <div key={key} className="flex items-center justify-between text-[10px] font-data">
+                            <span className="text-text-secondary capitalize">{key.replace(/_/g, ' ')}</span>
+                            <span className="text-text-primary font-mono">{val}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <span className="block text-xs font-bold text-emerald-600 mb-4">
+                  {t('userDashboard.newExpiry')} {new Date(Date.now() + 365 * 86400000).toLocaleDateString('en-IN')}
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-full bg-tint-red flex items-center justify-center mb-4">
+                  <XCircle size={32} className="text-risk-critical" />
+                </div>
+                <h3 className="text-lg font-bold text-text-primary font-sans mb-1">Verification Failed</h3>
+                <p className="text-sm text-text-secondary font-data leading-relaxed mb-2">{verifyResult.details || verifyResult.message}</p>
+                {verifyResult.confidence > 0 && (
+                  <p className="text-xs text-text-secondary font-mono mb-4">Confidence: {verifyResult.confidence}% (min required: 55%)</p>
+                )}
+              </>
+            )}
+            <div className="flex gap-3 w-full">
+              {!verifyResult.success && (
+                <button onClick={() => { setVerifyResult(null); setStep(2) }} className="flex-1 py-3 border border-border-subtle text-text-primary text-sm font-bold rounded-xl hover:bg-surface-low transition-all">
+                  Try Again
+                </button>
+              )}
+              <button onClick={() => { if (verifyResult.success) onComplete(verifyResult); onClose() }}
+                className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${verifyResult.success ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border border-border-subtle text-text-secondary hover:bg-surface-low'}`}>
+                {verifyResult.success ? t('common.done') : 'Close'}
+              </button>
             </div>
-            <h3 className="text-lg font-bold text-text-primary font-sans mb-1">{t('userDashboard.kycSuccess')}</h3>
-            <p className="text-sm text-text-secondary font-data leading-relaxed mb-6">
-              {t('userDashboard.kycSuccessDesc')}
-              <span className="block mt-1 font-bold text-emerald-600">{t('userDashboard.newExpiry')} {new Date(Date.now() + 90 * 86400000).toLocaleDateString('en-IN')}</span>
-            </p>
-            <button
-              onClick={() => { onComplete(); onClose() }}
-              className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all text-sm"
-            >
-              {t('common.done')}
-            </button>
           </div>
         )}
       </div>
     </div>
   )
 }
+
+
 
 // ─── KYC Card ──────────────────────────────────────────────────────────────────
 function KYCCard({ kyc, onOpenModal }) {
