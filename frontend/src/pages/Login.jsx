@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Shield, KeyRound, ChevronRight, Users, Building2, Map, ClipboardCheck, UserCheck } from 'lucide-react'
+import { Shield, KeyRound, ChevronRight, Users, Building2, Map, ClipboardCheck, UserCheck, Mail, Loader2, AlertCircle } from 'lucide-react'
+import { login } from '../api'
 
 const ROLES = [
   {
@@ -23,7 +24,7 @@ const ROLES = [
     jurisdiction: 'Gujarat State',
   },
   {
-    id: 'AUDIT_OFFICER',
+    id: 'AUDIT',
     title: 'Audit Officer',
     subtitle: 'Generate reports & verify scheme verifier submissions',
     icon: UserCheck,
@@ -31,6 +32,7 @@ const ROLES = [
     border: 'border-emerald-600',
     badge: 'bg-emerald-100 text-emerald-800',
     jurisdiction: 'State Audit Cell',
+    demo_email: 'audit@eduguard.in',
   },
   {
     id: 'SCHEME_VERIFIER',
@@ -51,23 +53,62 @@ const ROLES = [
     border: 'border-gray-500',
     badge: 'bg-gray-100 text-gray-700',
     jurisdiction: 'Sanand, Ahmedabad',
+    demo_email: 'user@eduguard.in',
   },
 ]
 
+// map from ROLES id → demo credentials
+const DEMO_CREDS = {
+  DFO:            { email: 'dfo@eduguard.in',      password: 'dfo@1234' },
+  STATE_ADMIN:    { email: 'admin@eduguard.in',    password: 'admin@1234' },
+  AUDIT:          { email: 'audit@eduguard.in',    password: 'audit@1234' },
+  SCHEME_VERIFIER:{ email: 'verifier@eduguard.in', password: 'verifier@1234' },
+  USER:           { email: 'user@eduguard.in',     password: 'user@1234' },
+}
+
 export default function Login({ onLogin }) {
   const [selectedRole, setSelectedRole] = useState('DFO')
-  const [key, setKey] = useState('')
-  const [error, setError] = useState('')
+  const [email, setEmail]     = useState('dfo@eduguard.in')
+  const [password, setPassword] = useState('dfo@1234')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
 
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (key !== 'admin123' && key !== '') {
-      setError('Invalid security key. Use admin123 for demo.')
-      return
+  // When user picks a role, auto-fill demo credentials
+  const handleRoleSelect = (roleId) => {
+    setSelectedRole(roleId)
+    const creds = DEMO_CREDS[roleId]
+    if (creds) {
+      setEmail(creds.email)
+      setPassword(creds.password)
     }
     setError('')
-    onLogin(selectedRole)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!email || !password) {
+      setError('Email and password are required')
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const data = await login(email.trim().toLowerCase(), password)
+      // Map backend roles to frontend role IDs
+      const backendToFrontend = {
+        DFO:            'DFO',
+        STATE_ADMIN:    'STATE_ADMIN',
+        AUDIT:          'AUDIT_OFFICER',
+        SCHEME_VERIFIER:'SCHEME_VERIFIER',
+        USER:           'USER',
+      }
+      onLogin(backendToFrontend[data.role] || data.role, data)
+    } catch (err) {
+      const msg = err?.response?.data?.detail || 'Login failed. Check credentials.'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const role = ROLES.find(r => r.id === selectedRole)
@@ -119,7 +160,7 @@ export default function Login({ onLogin }) {
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => setSelectedRole(r.id)}
+                  onClick={() => handleRoleSelect(r.id)}
                   className={`w-full flex items-center gap-4 p-3.5 rounded-lg border-2 text-left transition-all ${
                     active
                       ? `border-primary-override bg-blue-50 shadow-sm`
@@ -146,30 +187,58 @@ export default function Login({ onLogin }) {
               <span className="text-xs font-bold text-text-secondary uppercase tracking-widest font-data">{role.title}</span>
               <span className="text-xs text-text-secondary font-data">· {role.jurisdiction}</span>
             </div>
+
+            {/* Email field */}
             <div>
-              <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">
-                Security Clearance Key
-              </label>
+              <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setError('') }}
+                  placeholder="officer@eduguard.in"
+                  className="w-full pl-9 pr-4 py-2.5 bg-surface border border-gray-200 text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30 focus:border-primary-override transition-all"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Password field */}
+            <div>
+              <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Password</label>
               <div className="relative">
                 <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
                 <input
                   type="password"
-                  value={key}
-                  onChange={e => { setKey(e.target.value); setError('') }}
-                  placeholder="Enter key (or leave blank)"
+                  value={password}
+                  onChange={e => { setPassword(e.target.value); setError('') }}
+                  placeholder="••••••••"
                   className="w-full pl-9 pr-4 py-2.5 bg-surface border border-gray-200 text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30 focus:border-primary-override transition-all"
+                  required
                 />
               </div>
-              {error && <p className="text-xs text-risk-critical mt-1.5 font-data">{error}</p>}
-              <p className="text-xs text-text-secondary/60 mt-1.5 font-data">Demo key: admin123 (or leave blank)</p>
             </div>
+
+            {error && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <AlertCircle size={14} className="text-risk-critical flex-shrink-0" />
+                <p className="text-xs text-risk-critical font-data">{error}</p>
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full py-3 bg-gradient-to-b from-primary-override to-shell text-white text-sm font-bold rounded-lg shadow hover:shadow-lg hover:from-blue-900 transition-all flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full py-3 bg-gradient-to-b from-primary-override to-shell text-white text-sm font-bold rounded-lg shadow hover:shadow-lg hover:from-blue-900 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
             >
-              <Shield size={16} />
-              Authenticate Session
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Shield size={16} />}
+              {loading ? 'Authenticating…' : 'Authenticate Session'}
             </button>
+
+            <p className="text-[10px] text-text-secondary/50 font-data text-center">
+              Credentials are auto-filled from the selected role above.
+            </p>
           </form>
 
           <p className="text-[10px] font-mono text-text-secondary/40 text-center mt-6 uppercase leading-relaxed">

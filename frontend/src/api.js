@@ -1,195 +1,247 @@
 /**
- * src/api.js — EduGuard DBT API Client
+ * frontend/src/api.js
+ * Centralised API client.
  *
- * Every function tries the real API first.
- * On network error or non-2xx response it returns the mock fallback
- * so the UI always has data to display.
+ * - Reads/writes the JWT from localStorage under key "eduguard_token"
+ * - Attaches Authorization: Bearer <token> to every request
+ * - On 401 → dispatches a custom "auth:expired" event so the app can reset
+ * - Every exported function has a safe() wrapper that never throws to the caller
  */
 import axios from 'axios'
-import { mockInvestigations, mockInstitutions, mockVerifiers } from './mock/dfoMock'
-import { mockDistrictStats, mockSchemes }                       from './mock/adminMock'
-import { mockData as mockUserData }                             from './mock/mockData'
 
 const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const TOKEN_KEY = 'eduguard_token'
+const USER_KEY  = 'eduguard_user'
 
-const http = axios.create({ baseURL: BASE, timeout: 10000 })
+// ── Token helpers ─────────────────────────────────────────────────────────────
 
-// ── Generic safe-fetch wrapper ─────────────────────────────────────────────
-async function safe(apiFn, fallback) {
+export const tokenStore = {
+  get:    ()        => localStorage.getItem(TOKEN_KEY),
+  set:    (t)       => localStorage.setItem(TOKEN_KEY, t),
+  clear:  ()        => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(USER_KEY) },
+  getUser:()        => { try { return JSON.parse(localStorage.getItem(USER_KEY) || 'null') } catch { return null } },
+  setUser:(u)       => localStorage.setItem(USER_KEY, JSON.stringify(u)),
+}
+
+// ── Axios instance ────────────────────────────────────────────────────────────
+
+const client = axios.create({ baseURL: BASE })
+
+// Request interceptor → attach bearer token
+client.interceptors.request.use((config) => {
+  const token = tokenStore.get()
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
+  return config
+})
+
+// Response interceptor → handle 401 globally
+client.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      tokenStore.clear()
+      window.dispatchEvent(new CustomEvent('auth:expired'))
+    }
+    return Promise.reject(err)
+  }
+)
+
+// ── Safe wrapper ──────────────────────────────────────────────────────────────
+// Catches any network / auth error and returns `fallback` instead.
+// Usage: const data = await safe(() => client.get('/api/dfo/dashboard'), [])
+
+async function safe(fn, fallback = null) {
   try {
-    const res = await apiFn()
+    const res = await fn()
     return res.data
   } catch (err) {
-    console.warn('[api] fallback used →', err?.message || err)
-    return typeof fallback === 'function' ? fallback() : fallback
+    if (err.response?.status === 403) {
+      console.warn('[api] 403 Forbidden — check your role')
+    }
+    return fallback
   }
 }
 
-// =============================================================================
-// ANALYSIS
-// =============================================================================
-export const runAnalysis = (runId = 'demo-001') =>
-  http.post('/api/run-analysis', { run_id: runId })
+// ── AUTH ─────────────────────────────────────────────────────────────────────
 
-// =============================================================================
-// FLAGS (DFO / Audit)
-// =============================================================================
-export const getFlags = () =>
-  safe(() => http.get('/api/flags'), [])
-
-export const getFlag = (flagId) =>
-  safe(() => http.get(`/api/flag/${flagId}`), null)
-
-export const updateFlagStatus = (flagId, status) =>
-  safe(() => http.patch(`/api/flag/${flagId}/status`, { status }), { flag_id: flagId, status })
-
-// =============================================================================
-// STATS
-// =============================================================================
-export const getStats = () =>
-  safe(() => http.get('/api/stats'), {
-    by_leakage_type: { DECEASED: 12, DUPLICATE: 8, UNDRAWN: 18, CROSS_SCHEME: 5 },
-    by_district: {},
-    by_scheme: {},
-    total_amount_at_risk: 1450000,
+export async function login(email, password) {
+  // Login is unauthenticated, use plain axios
+  const res = await axios.post(`${BASE}/api/auth/login`, { email, password })
+  const data = res.data
+  tokenStore.set(data.access_token)
+  tokenStore.setUser({
+    officer_id: data.officer_id,
+    role:       data.role,
+    name:       data.name,
+    district:   data.district,
   })
+  return data
+}
 
-// =============================================================================
-// DISTRICT STATS (State Admin Heatmap)
-// =============================================================================
-export const getDistrictStats = () =>
-  safe(() => http.get('/api/district-stats'), mockDistrictStats)
+export async function logout() {
+  await safe(() => client.post('/api/auth/logout'))
+  tokenStore.clear()
+}
 
-// =============================================================================
-// INVESTIGATIONS (DFO)
-// =============================================================================
-export const getInvestigations = (params = {}) =>
-  safe(() => http.get('/api/investigations', { params }), mockInvestigations)
+export async function getMe() {
+  return safe(() => client.get('/api/auth/me'))
+}
 
-export const getInvestigation = (caseId) =>
-  safe(
-    () => http.get(`/api/investigations/${caseId}`),
-    () => mockInvestigations.find(i => i.case_id === caseId) || null,
-  )
+// ── HEALTH ────────────────────────────────────────────────────────────────────
 
-export const assignInvestigation = (caseId, verifierId) =>
-  safe(
-    () => http.patch(`/api/investigations/${caseId}/assign`, { verifier_id: verifierId }),
-    { case_id: caseId, status: 'ASSIGNED_TO_VERIFIER', verifier_id: verifierId },
-  )
+export async function getHealth() {
+  return safe(() => client.get('/api/health'), { status: 'unknown' })
+}
 
-// =============================================================================
-// EVIDENCE (Scheme Verifier)
-// =============================================================================
-export const submitEvidence = (caseId, payload) =>
-  safe(
-    () => http.post(`/api/evidence/${caseId}`, payload),
-    { success: true, case_id: caseId },
-  )
+// ── ANALYSIS (DFO / Admin / Audit) ───────────────────────────────────────────
 
-// =============================================================================
-// AUDIT OFFICER
-// =============================================================================
-export const getAuditPending = () =>
-  safe(
-    () => http.get('/api/audit/pending'),
-    () => mockInvestigations.filter(i => i.status === 'VERIFICATION_SUBMITTED'),
-  )
+export async function runAnalysis(runId = 'demo-001') {
+  return safe(() => client.post('/api/run-analysis', { run_id: runId }), null)
+}
 
-export const auditDecide = (caseId, decision, notes = '') =>
-  safe(
-    () => http.post(`/api/audit/${caseId}/decide`, { decision, notes }),
-    { case_id: caseId, decision },
-  )
+export async function getFlags() {
+  return safe(() => client.get('/api/flags'), [])
+}
 
-// =============================================================================
-// INSTITUTIONS / MIDDLEMEN (DFO)
-// =============================================================================
-export const getInstitutions = (params = {}) =>
-  safe(() => http.get('/api/institutions', { params }), mockInstitutions)
+export async function getFlag(flagId) {
+  return safe(() => client.get(`/api/flag/${flagId}`), null)
+}
 
-// =============================================================================
-// VERIFIERS (DFO)
-// =============================================================================
-export const getVerifiers = (district) =>
-  safe(() => http.get('/api/verifiers', { params: district ? { district } : {} }), mockVerifiers)
+export async function updateFlagStatus(flagId, status) {
+  return safe(() => client.patch(`/api/flag/${flagId}/status`, { status }), null)
+}
 
-// =============================================================================
-// SCHEMES (State Admin)
-// =============================================================================
-export const getSchemes = () =>
-  safe(() => http.get('/api/schemes'), mockSchemes)
+export async function getStats() {
+  return safe(() => client.get('/api/stats'), {
+    by_leakage_type: {}, by_district: {}, by_scheme: {}, total_amount_at_risk: 0
+  })
+}
 
-export const updateScheme = (schemeId, payload) =>
-  safe(
-    () => http.patch(`/api/schemes/${schemeId}`, payload),
-    () => mockSchemes.find(s => s.scheme_id === schemeId) || {},
-  )
+export async function getReport() {
+  return safe(() => client.get('/api/report'), 'Report unavailable')
+}
 
-// =============================================================================
-// USER / BENEFICIARY
-// =============================================================================
-export const getUser = (userId = 'USR-GJ-001') =>
-  safe(() => http.get(`/api/user/${userId}`), mockUserData?.user || _fallbackUser())
+// ── DFO ───────────────────────────────────────────────────────────────────────
 
-export const renewKYC = (userId, validityDays = 90) =>
-  safe(
-    () => http.post(`/api/user/${userId}/kyc`, { validity_days: validityDays }),
-    { success: true, days_remaining: validityDays },
-  )
+export async function getDFODashboard() {
+  return safe(() => client.get('/api/dfo/dashboard'), null)
+}
 
-// =============================================================================
-// STUDENTS
-// =============================================================================
-export const getStudents = (params = {}) =>
-  safe(() => http.get('/api/students', { params }), [])
+export async function getInvestigations(params = {}) {
+  return safe(() => client.get('/api/dfo/investigations', { params }), { total: 0, cases: [] })
+}
 
-export const getStudent = (beneficiaryId) =>
-  safe(() => http.get(`/api/student/${beneficiaryId}`), null)
+export async function getInvestigation(caseId) {
+  return safe(() => client.get(`/api/dfo/investigations/${caseId}`), null)
+}
 
-// =============================================================================
-// REPORT
-// =============================================================================
-export const getReport = () =>
-  http.get('/api/report', { responseType: 'text' })
+export async function assignInvestigation(caseId, verifierId) {
+  return safe(() => client.patch(`/api/dfo/investigations/${caseId}/assign`, { verifier_id: verifierId }), null)
+}
 
-// =============================================================================
-// HEALTH
-// =============================================================================
-export const checkHealth = () =>
-  safe(() => http.get('/api/health'), { status: 'offline', mongodb: false })
+export async function getInstitutions(params = {}) {
+  return safe(() => client.get('/api/dfo/institutions', { params }), [])
+}
 
-// =============================================================================
-// LEGACY compat (old api object used by Dashboard/AuditReport/etc.)
-// =============================================================================
+export async function getVerifiers() {
+  return safe(() => client.get('/api/dfo/verifiers'), [])
+}
+
+export async function getStudents(params = {}) {
+  return safe(() => client.get('/api/dfo/students', { params }), { total: 0, students: [] })
+}
+
+export async function getStudent(id) {
+  return safe(() => client.get(`/api/dfo/student/${id}`), null)
+}
+
+// ── STATE ADMIN ───────────────────────────────────────────────────────────────
+
+export async function getAdminOverview() {
+  return safe(() => client.get('/api/admin/overview'), null)
+}
+
+export async function getDistrictStats() {
+  return safe(() => client.get('/api/admin/district-stats'), [])
+}
+
+export async function getSchemes() {
+  return safe(() => client.get('/api/admin/schemes'), [])
+}
+
+export async function updateScheme(schemeId, payload) {
+  return safe(() => client.patch(`/api/admin/schemes/${schemeId}`, payload), null)
+}
+
+export async function getOfficers() {
+  return safe(() => client.get('/api/admin/officers'), [])
+}
+
+// ── SCHEME VERIFIER ───────────────────────────────────────────────────────────
+
+export async function getMyCases() {
+  return safe(() => client.get('/api/verifier/my-cases'), { total: 0, cases: [] })
+}
+
+export async function getVerifierCase(caseId) {
+  return safe(() => client.get(`/api/verifier/case/${caseId}`), null)
+}
+
+export async function submitEvidence(caseId, evidencePayload) {
+  return safe(() => client.post(`/api/verifier/evidence/${caseId}`, evidencePayload), null)
+}
+
+// ── AUDIT ─────────────────────────────────────────────────────────────────────
+
+export async function getAuditPending() {
+  return safe(() => client.get('/api/audit/pending'), { total: 0, pending: [] })
+}
+
+export async function getAuditCase(caseId) {
+  return safe(() => client.get(`/api/audit/case/${caseId}`), null)
+}
+
+export async function auditDecide(caseId, finalDecision, auditorNotes = '') {
+  return safe(() => client.post(`/api/audit/${caseId}/decide`, {
+    final_decision: finalDecision,
+    auditor_notes:  auditorNotes,
+  }), null)
+}
+
+export async function getAuditHistory() {
+  return safe(() => client.get('/api/audit/all'), { total: 0, reviewed: [] })
+}
+
+// ── USER ──────────────────────────────────────────────────────────────────────
+
+export async function getUser() {
+  return safe(() => client.get('/api/user/profile'), null)
+}
+
+export async function getUserSchemes() {
+  return safe(() => client.get('/api/user/schemes'), { count: 0, schemes: [] })
+}
+
+export async function getUserPayments() {
+  return safe(() => client.get('/api/user/payments'), { count: 0, payments: [] })
+}
+
+// KYC excluded per spec — placeholder only
+export async function renewKYC() {
+  return { success: true, message: 'KYC renewal not yet wired to backend' }
+}
+
+// ── Legacy compatibility (old dashboard components use api.runAnalysis etc.) ──
+
 export const api = {
-  runAnalysis:      () => http.post('/api/run-analysis', { run_id: 'demo-001' }),
-  getFlags:         () => http.get('/api/flags'),
-  getFlag:          (id) => http.get(`/api/flag/${id}`),
-  updateFlagStatus: (id, status) => http.patch(`/api/flag/${id}/status`, { status }),
-  getStats:         () => http.get('/api/stats'),
-  getReport:        () => http.get('/api/report', { responseType: 'text' }),
-  getInstitutions:  () => http.get('/api/institutions'),
-  getInvestigations: () => http.get('/api/investigations'),
-  assignCase:       (caseId, verifierId) => http.patch(`/api/investigations/${caseId}/assign`, { verifier_id: verifierId }),
-  getSchemes:       () => http.get('/api/schemes'),
-  updateScheme:     (schemeId, rules) => http.patch(`/api/schemes/${schemeId}`, rules),
-  getDistrictStats: () => http.get('/api/district-stats'),
+  runAnalysis:     () => client.post('/api/run-analysis', { run_id: 'demo-001' }),
+  getFlags:        () => client.get('/api/flags'),
+  getFlag:         (id) => client.get(`/api/flag/${id}`),
+  updateFlagStatus:(id, status) => client.patch(`/api/flag/${id}/status`, { status }),
+  getStats:        () => client.get('/api/stats'),
+  getReport:       () => client.get('/api/report'),
 }
 
-// ── Internal fallback ────────────────────────────────────────────────────────
-function _fallbackUser() {
-  return {
-    user_id: 'USR-GJ-001',
-    full_name: 'Karan Patel',
-    aadhaar_display: 'XXXX-XXXX-4964',
-    phone: '+91 98765 43210',
-    demographics: { district: 'Ahmedabad', taluka: 'Sanand', gender: 'M', dob: '2006-05-14', category: 'OBC' },
-    bank: { bank: 'SBI', account_display: 'XXXXXX3421', ifsc: 'SBIN0001234' },
-    kyc_profile: { is_kyc_compliant: true, last_kyc_date: '2026-03-01', kyc_expiry_date: '2026-06-01', dynamic_validity_days: 90, kyc_method: 'BIOMETRIC_OR_OTP', days_remaining: 44 },
-    registered_schemes: [
-      { scheme_id: 'SCH-MGMS', name: 'Mukhyamantri Gyan Sadhana Merit Scholarship', status: 'ACTIVE', registration_date: '2025-08-15', amount: 20000, last_payment: '2025-11-01', next_payment: '2026-04-01' },
-      { scheme_id: 'SCH-NLY',  name: 'Namo Lakshmi Yojana', status: 'PENDING_VERIFICATION', registration_date: '2026-01-10', amount: 25000, last_payment: null, next_payment: null },
-    ],
-  }
-}
+export default client

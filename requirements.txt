@@ -6,3 +6,6 @@ pymongo[srv]
 pydantic
 thefuzz
 python-Levenshtein
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.2.1

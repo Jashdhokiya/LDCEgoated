@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
+import { tokenStore, getMe, logout as apiLogout } from './api'
 
 // DFO
 import Dashboard from './pages/dfo/Dashboard'
@@ -38,19 +39,58 @@ const DEFAULT_PAGE = {
 export default function App() {
   const [stage, setStage] = useState('landing') // 'landing' | 'login' | 'app'
   const [role, setRole]   = useState(null)
+  const [officer, setOfficer] = useState(null)  // decoded JWT payload
   const [activePage, setActivePage] = useState('dashboard')
   const [selectedFlagId, setSelectedFlagId] = useState(null)
   const [analysisData, setAnalysisData]     = useState(null)
   const [selectedVerifierCase, setSelectedVerifierCase] = useState(null)
 
-  const handleLogin = (selectedRole) => {
+  // ── Restore session from localStorage on page load ────────────────────
+  useEffect(() => {
+    const storedUser = tokenStore.getUser()
+    const token = tokenStore.get()
+    if (token && storedUser) {
+      const backendToFrontend = {
+        DFO: 'DFO', STATE_ADMIN: 'STATE_ADMIN',
+        AUDIT: 'AUDIT_OFFICER', SCHEME_VERIFIER: 'SCHEME_VERIFIER', USER: 'USER',
+      }
+      const frontendRole = backendToFrontend[storedUser.role] || storedUser.role
+      // Validate token server-side in background
+      getMe().then(me => {
+        if (me?.role) {
+          setOfficer(storedUser)
+          setRole(frontendRole)
+          setActivePage(DEFAULT_PAGE[frontendRole] || 'dashboard')
+          setStage('app')
+        } else {
+          tokenStore.clear()
+        }
+      }).catch(() => tokenStore.clear())
+    }
+
+    // Listen for token expiry (emitted by axios 401 interceptor)
+    const onExpired = () => {
+      setRole(null)
+      setOfficer(null)
+      setActivePage('dashboard')
+      setAnalysisData(null)
+      setStage('login')
+    }
+    window.addEventListener('auth:expired', onExpired)
+    return () => window.removeEventListener('auth:expired', onExpired)
+  }, [])
+
+  const handleLogin = (selectedRole, data) => {
     setRole(selectedRole)
+    setOfficer(data || null)
     setActivePage(DEFAULT_PAGE[selectedRole] || 'dashboard')
     setStage('app')
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await apiLogout()
     setRole(null)
+    setOfficer(null)
     setActivePage('dashboard')
     setAnalysisData(null)
     setStage('landing')
@@ -68,7 +108,7 @@ export default function App() {
   // ── Authenticated portal ──────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-workspace text-text-primary">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} role={role} onLogout={handleLogout} />
+      <Sidebar activePage={activePage} onNavigate={setActivePage} role={role} officer={officer} onLogout={handleLogout} />
 
       <main className="flex-1 overflow-auto bg-workspace">
 
