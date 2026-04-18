@@ -33,10 +33,10 @@ def _col(name: str):
 # ── Fallback data ─────────────────────────────────────────────────────────────
 
 FALLBACK_INSTITUTIONS = [
-    {"institution_id": "INST-001", "name": "Sarvodaya Bank (Gujarat Rural Co-op)", "type": "BANK", "taluka": "Sanand", "district": "Ahmedabad", "beneficiary_count": 342, "risk_profile": {"risk_score": 82, "is_flagged": True, "flag_reason": "Delayed disbursement to 67 students — avg 18 days post-credit"}, "financial_ledger": {"current_holding": 1850000, "total_funds_credited": 8500000}},
-    {"institution_id": "INST-002", "name": "Shri Gyan School (UDISE 24010023)", "type": "SCHOOL", "taluka": "Daskroi", "district": "Ahmedabad", "beneficiary_count": 218, "risk_profile": {"risk_score": 76, "is_flagged": True, "flag_reason": "14 students marked enrolled despite death records"}, "financial_ledger": {"current_holding": 1240000, "total_funds_credited": 5200000}},
-    {"institution_id": "INST-003", "name": "National Bank of Gujarat (Branch 42)", "type": "BANK", "taluka": "Viramgam", "district": "Ahmedabad", "beneficiary_count": 198, "risk_profile": {"risk_score": 54, "is_flagged": False, "flag_reason": None}, "financial_ledger": {"current_holding": 980000, "total_funds_credited": 3800000}},
-    {"institution_id": "INST-004", "name": "Pragati Vidyalaya (UDISE 24020041)", "type": "SCHOOL", "taluka": "Sachin", "district": "Surat", "beneficiary_count": 289, "risk_profile": {"risk_score": 67, "is_flagged": True, "flag_reason": "23 cross-scheme payments processed through single bank account"}, "financial_ledger": {"current_holding": 1560000, "total_funds_credited": 6200000}},
+    {"institution_id": "INST-001", "name": "Sarvodaya Bank (Gujarat Rural Co-op)", "type": "BANK", "taluka": "Sanand", "district": "Ahmedabad", "beneficiary_count": 342, "risk_profile": {"risk_score": 82, "is_flagged": True, "flag_reason": "Delayed disbursement to 67 students — avg 18 days post-credit"}, "financial_ledger": {"current_holding": 1850000, "total_funds_credited": 8500000, "total_funds_debited": 6650000}},
+    {"institution_id": "INST-002", "name": "Shri Gyan School (UDISE 24010023)", "type": "SCHOOL", "taluka": "Daskroi", "district": "Ahmedabad", "beneficiary_count": 218, "risk_profile": {"risk_score": 76, "is_flagged": True, "flag_reason": "14 students marked enrolled despite death records"}, "financial_ledger": {"current_holding": 1240000, "total_funds_credited": 5200000, "total_funds_debited": 3960000}},
+    {"institution_id": "INST-003", "name": "National Bank of Gujarat (Branch 42)", "type": "BANK", "taluka": "Viramgam", "district": "Ahmedabad", "beneficiary_count": 198, "risk_profile": {"risk_score": 54, "is_flagged": False, "flag_reason": None}, "financial_ledger": {"current_holding": 980000, "total_funds_credited": 3800000, "total_funds_debited": 2820000}},
+    {"institution_id": "INST-004", "name": "Pragati Vidyalaya (UDISE 24020041)", "type": "SCHOOL", "taluka": "Sachin", "district": "Surat", "beneficiary_count": 289, "risk_profile": {"risk_score": 67, "is_flagged": True, "flag_reason": "23 cross-scheme payments processed through single bank account"}, "financial_ledger": {"current_holding": 1560000, "total_funds_credited": 6200000, "total_funds_debited": 4640000}},
 ]
 
 
@@ -93,31 +93,75 @@ async def list_investigations(
     limit: int = 50,
     user: dict = Depends(require_role("DFO", "SCHEME_VERIFIER", "AUDIT")),
 ):
-    """Flags scoped to the officer's district."""
-    district = user.get("district")
+    # Try dedicated investigations collection first
     col = _col("investigations")
-    if col is None:
-        # Fall back to flags collection
-        col = _col("flags")
-
-    # ALWAYS filter by district first
-    query: dict = {}
-    if district:
-        query["district"] = district
-    if status:
-        query["status"] = status
-    if leakage_type:
-        query["leakage_type"] = leakage_type
-
     if col is not None:
+        query: dict = {}
+        if status:
+            query["status"] = status
+        if district:
+            query["district"] = district
+        if leakage_type:
+            query["leakage_type"] = leakage_type
         try:
             docs = list(col.find(query, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
-            total = col.count_documents(query)
-            return {"total": total, "cases": docs}
+            if docs:
+                return {"total": col.count_documents(query), "cases": docs}
         except Exception:
             pass
 
-    return {"total": 0, "cases": []}
+    # Fall back to flags collection (from run-analysis)
+    flags_col = _col("flags")
+    flags: list = []
+    if flags_col is not None:
+        fquery: dict = {}
+        if status:
+            fquery["status"] = status
+        if district:
+            fquery["district"] = district
+        if leakage_type:
+            fquery["leakage_type"] = leakage_type
+        try:
+            flags = list(flags_col.find(fquery, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
+        except Exception:
+            pass
+
+    # Fall back to in-memory flag store from analysis.py
+    if not flags:
+        try:
+            from .analysis import _flag_store
+            all_flags = sorted(_flag_store.values(), key=lambda x: x.get("risk_score", 0), reverse=True)
+            # Apply filters
+            if status:
+                all_flags = [f for f in all_flags if f.get("status") == status]
+            if district:
+                all_flags = [f for f in all_flags if f.get("district") == district]
+            if leakage_type:
+                all_flags = [f for f in all_flags if f.get("leakage_type") == leakage_type]
+            flags = all_flags[skip:skip + limit]
+        except Exception:
+            pass
+
+    # Normalize flags into investigation-compatible shape
+    cases = []
+    for f in flags:
+        cases.append({
+            "case_id":          f.get("flag_id"),
+            "flag_id":          f.get("flag_id"),
+            "beneficiary_name": f.get("beneficiary_name"),
+            "beneficiary_id":  f.get("beneficiary_id"),
+            "district":         f.get("district"),
+            "scheme":           f.get("scheme"),
+            "leakage_type":     f.get("leakage_type"),
+            "payment_amount":   f.get("payment_amount", 0),
+            "risk_score":       f.get("risk_score", 0),
+            "risk_label":       f.get("risk_label"),
+            "status":           f.get("status", "OPEN"),
+            "evidence":         f.get("evidence"),
+            "recommended_action": f.get("recommended_action"),
+        })
+
+    return {"total": len(cases), "cases": cases}
 
 
 @router.get("/investigations/{case_id}")
