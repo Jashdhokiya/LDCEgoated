@@ -28,25 +28,37 @@ def get_current_user(
         )
 
     try:
-        from database import get_officers_collection
+        from database import get_db
 
-        col = get_officers_collection()
-        if col is None:
+        db = get_db()
+        if db is None:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable")
 
-        officer = col.find_one({"officer_id": payload.get("sub")}, {"_id": 0, "password_hash": 0})
-        if not officer:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account not found or revoked",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        if not officer.get("is_active", False):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User account is disabled",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        role = payload.get("role")
+        sub_id = payload.get("sub")
+
+        if role == "USER":
+            user_doc = db["users"].find_one({"user_id": sub_id}, {"_id": 0, "password_hash": 0})
+            if not user_doc:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User account not found or revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        else:
+            officer_doc = db["officers"].find_one({"officer_id": sub_id}, {"_id": 0, "password_hash": 0})
+            if not officer_doc:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Officer account not found or revoked",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            if not officer_doc.get("is_active", False):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Officer account is disabled",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
     except HTTPException:
         raise
     except Exception as exc:
