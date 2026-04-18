@@ -19,6 +19,7 @@ import io
 import logging
 import os
 import urllib.request
+import uuid
 from typing import Optional, Tuple
 
 import cv2
@@ -83,11 +84,26 @@ def upload_face(b64_string: str) -> str:
         return url or b64_string
     except Exception as e:
         logger.error(f"[face_verify] Cloudinary upload failed: {e}")
+        
+    # Local fallback if Cloudinary isn't configured or failed
+    try:
+        os.makedirs("data/faces", exist_ok=True)
+        filename = f"data/faces/face_{uuid.uuid4().hex[:8]}.jpg"
+        
+        # Decode and save locally
+        clean_b64 = b64_string.split(",", 1)[1] if "," in b64_string else b64_string
+        img_bytes = base64.b64decode(clean_b64)
+        with open(filename, "wb") as f:
+            f.write(img_bytes)
+        logger.info(f"[face_verify] Saved face locally: {filename}")
+        return filename
+    except Exception as fallback_e:
+        logger.error(f"[face_verify] Local fallback failed: {fallback_e}")
         return b64_string
 
 
 def _b64_to_cv2(image_data: str) -> Optional[np.ndarray]:
-    """Decode a base64 image string OR download from a URL to an OpenCV BGR image."""
+    """Decode a base64 image string OR download from a URL OR load from local path."""
     try:
         if image_data.startswith("http://") or image_data.startswith("https://"):
             # It's a URL
@@ -95,6 +111,10 @@ def _b64_to_cv2(image_data: str) -> Optional[np.ndarray]:
             arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             return img
+
+        if os.path.exists(image_data):
+            # It's a local file path
+            return cv2.imread(image_data, cv2.IMREAD_COLOR)
 
         # Strip data URL prefix if present for base64
         if "," in image_data:
