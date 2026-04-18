@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Shield, LayoutDashboard, List, Map, FileText, Building2, AlertTriangle, BookOpen, BarChart3, LogOut, UserCircle } from 'lucide-react'
+import { Shield, LayoutDashboard, List, Map, FileText, Building2, AlertTriangle, BookOpen, BarChart3, LogOut, UserCircle, CheckCircle } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 import LanguageToggle from './LanguageToggle'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -10,7 +10,6 @@ const DFO_NAV = [
   { path: '/dfo/middlemen',            label: 'Middlemen',           labelKey: 'sidebar.middlemen',        icon: Building2 },
   { path: '/dfo/flagged-institutions', label: 'Flagged Institutions',labelKey: 'sidebar.flaggedInstitutions', icon: AlertTriangle },
   { path: '/dfo/heatmap',              label: 'Risk Heatmap',        labelKey: 'sidebar.riskHeatmap',      icon: Map },
-  { path: '/dfo/report',               label: 'Audit Report',        labelKey: 'sidebar.auditReport',      icon: FileText },
 ]
 
 const ADMIN_NAV = [
@@ -27,6 +26,7 @@ const AUDIT_NAV = [
 
 const VERIFIER_NAV = [
   { path: '/verifier/my-cases',    label: 'My Open Cases',     labelKey: 'sidebar.myOpenCases',     icon: List },
+  { path: '/verifier/closed',      label: 'Closed Cases',      labelKey: 'sidebar.closedCases',     icon: CheckCircle },
 ]
 
 const USER_NAV = [
