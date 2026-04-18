@@ -20,6 +20,7 @@ const PRIORITY = {
 
 export default function SchemeVerifierDashboard() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [cases, setCases] = useState([])
   const [submitted, setSubmitted] = useState(new Set())
 

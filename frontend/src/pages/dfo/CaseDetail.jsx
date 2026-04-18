@@ -5,7 +5,8 @@ import { LeakageBadge } from '../../components/RiskBadge'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 
-export default function CaseDetail({ flagId }) {
+export default function CaseDetail() {
+  const { flagId } = useParams()
   const { t } = useLanguage()
   const [flag, setFlag] = useState(null)
   const [loading, setLoading] = useState(true)

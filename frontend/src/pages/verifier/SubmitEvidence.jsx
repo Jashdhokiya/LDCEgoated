@@ -114,6 +114,7 @@ function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate })
 export default function SubmitEvidence() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const caseData = location.state?.caseData
   const onBack = () => navigate('/verifier/my-cases')
   const onComplete = () => navigate('/verifier/my-cases')

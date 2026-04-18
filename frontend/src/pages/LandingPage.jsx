@@ -4,7 +4,8 @@ import ThemeToggle from '../components/ThemeToggle'
 import LanguageToggle from '../components/LanguageToggle'
 import { useLanguage } from '../i18n/LanguageContext'
 
-export default function LandingPage({ onEnter }) {
+export default function LandingPage() {
+  const navigate = useNavigate()
   const { t } = useLanguage()
 
   const FEATURES = [

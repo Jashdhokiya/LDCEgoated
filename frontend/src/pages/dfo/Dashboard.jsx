@@ -10,6 +10,7 @@ const COLORS = { DECEASED: '#E63946', DUPLICATE: '#F5A623', UNDRAWN: '#EAB308', 
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [analysisData, setAnalysisData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState(null)
@@ -138,7 +139,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-6">
                     <span className="text-lg font-mono font-medium text-risk-critical">₹{flag.payment_amount?.toLocaleString('en-IN')}</span>
-                    <button onClick={() => onOpenCase(flag.flag_id)} className="text-sm font-sans font-semibold text-primary-override hover:text-blue-700 bg-surface-lowest shadow-sm border border-border-subtle px-3 py-1.5 rounded-md transition-colors">{t('common.review')} →</button>
+                    <button onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} className="text-sm font-sans font-semibold text-primary-override hover:text-blue-700 bg-surface-lowest shadow-sm border border-border-subtle px-3 py-1.5 rounded-md transition-colors">{t('common.review')} →</button>
                   </div>
                 </div>
               ))}

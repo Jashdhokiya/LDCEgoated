@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, KeyRound, ChevronRight, Users, Building2, Map, ClipboardCheck, UserCheck, Mail, Loader2, AlertCircle } from 'lucide-react'
 import { login } from '../api'
+import { useAuth, DEFAULT_PATHS } from '../contexts/AuthContext'
 import ThemeToggle from '../components/ThemeToggle'
 import LanguageToggle from '../components/LanguageToggle'
 import { useLanguage } from '../i18n/LanguageContext'
@@ -68,7 +69,9 @@ const DEMO_CREDS = {
   USER:           { email: 'user@eduguard.in',     password: 'user@1234' },
 }
 
-export default function Login({ onLogin }) {
+export default function Login() {
+  const navigate = useNavigate()
+  const { login: authLogin } = useAuth()
   const { t } = useLanguage()
   const [selectedRole, setSelectedRole] = useState('DFO')
   const [email, setEmail]     = useState('dfo@eduguard.in')

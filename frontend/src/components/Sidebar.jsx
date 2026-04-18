@@ -5,32 +5,32 @@ import LanguageToggle from './LanguageToggle'
 import { useLanguage } from '../i18n/LanguageContext'
 
 const DFO_NAV = [
-  { path: '/dfo/dashboard',            label: 'Overview',            icon: LayoutDashboard },
-  { path: '/dfo/queue',                label: 'Investigation Queue', icon: List },
-  { path: '/dfo/middlemen',            label: 'Middlemen',           icon: Building2 },
-  { path: '/dfo/flagged-institutions', label: 'Flagged Institutions',icon: AlertTriangle },
-  { path: '/dfo/heatmap',              label: 'Risk Heatmap',        icon: Map },
-  { path: '/dfo/report',               label: 'Audit Report',        icon: FileText },
+  { path: '/dfo/dashboard',            label: 'Overview',            labelKey: 'sidebar.overview',         icon: LayoutDashboard },
+  { path: '/dfo/queue',                label: 'Investigation Queue', labelKey: 'sidebar.investigationQueue', icon: List },
+  { path: '/dfo/middlemen',            label: 'Middlemen',           labelKey: 'sidebar.middlemen',        icon: Building2 },
+  { path: '/dfo/flagged-institutions', label: 'Flagged Institutions',labelKey: 'sidebar.flaggedInstitutions', icon: AlertTriangle },
+  { path: '/dfo/heatmap',              label: 'Risk Heatmap',        labelKey: 'sidebar.riskHeatmap',      icon: Map },
+  { path: '/dfo/report',               label: 'Audit Report',        labelKey: 'sidebar.auditReport',      icon: FileText },
 ]
 
 const ADMIN_NAV = [
-  { path: '/admin/gujarat-map',      label: 'Gujarat Heatmap',  icon: Map },
-  { path: '/admin/district-overview',label: 'District Overview', icon: BarChart3 },
-  { path: '/admin/rules-engine',     label: 'Rules Engine',     icon: BookOpen },
+  { path: '/admin/gujarat-map',      label: 'Gujarat Heatmap',  labelKey: 'sidebar.gujaratHeatmap',  icon: Map },
+  { path: '/admin/district-overview',label: 'District Overview', labelKey: 'sidebar.districtOverview', icon: BarChart3 },
+  { path: '/admin/rules-engine',     label: 'Rules Engine',     labelKey: 'sidebar.rulesEngine',     icon: BookOpen },
 ]
 
 const AUDIT_NAV = [
-  { path: '/audit/overview',       label: 'Overview',          icon: LayoutDashboard },
-  { path: '/audit/report',         label: 'Generate Report',   icon: FileText },
-  { path: '/audit/verifier-queue', label: 'Verifier Reports',  icon: List },
+  { path: '/audit/overview',       label: 'Overview',          labelKey: 'sidebar.overview',        icon: LayoutDashboard },
+  { path: '/audit/report',         label: 'Generate Report',   labelKey: 'sidebar.generateReport',  icon: FileText },
+  { path: '/audit/verifier-queue', label: 'Verifier Reports',  labelKey: 'sidebar.verifierReports', icon: List },
 ]
 
 const VERIFIER_NAV = [
-  { path: '/verifier/my-cases',    label: 'My Open Cases',     icon: List },
+  { path: '/verifier/my-cases',    label: 'My Open Cases',     labelKey: 'sidebar.myOpenCases',     icon: List },
 ]
 
 const USER_NAV = [
-  { path: '/user/dashboard',      label: 'My Dashboard',      icon: UserCircle },
+  { path: '/user/dashboard',      label: 'My Dashboard',      labelKey: 'sidebar.myDashboard',     icon: UserCircle },
 ]
 
 const NAV_BY_ROLE = {
@@ -68,6 +68,7 @@ const ACTIVE_CLASS = {
 export default function Sidebar({ role, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const navItems    = NAV_BY_ROLE[role] || DFO_NAV
   const accentDot   = ROLE_ACCENT[role]  || 'bg-blue-500'
   const sidebarBg   = SIDEBAR_BG[role]   || 'bg-shell'
@@ -79,17 +80,17 @@ export default function Sidebar({ role, onLogout }) {
       <div className="p-5 pt-8">
         <div className="flex items-center gap-3 mb-2">
           <Shield className="text-blue-400" size={26} strokeWidth={2.5} />
-          <span className="font-bold text-xl tracking-tight font-sans">{t('sidebar.brand')}</span>
+          <span className="font-bold text-xl tracking-tight font-sans">{t('sidebar.brand') || 'EduGuard'}</span>
         </div>
         <p className="text-xs text-white/50 leading-relaxed font-data">
-          {t('common.govGujarat')}<br />{t('common.dbtLeakage')}
+          {t('common.govGujarat') || 'Government of Gujarat'}<br />{t('common.dbtLeakage') || 'DBT Leakage Detection'}
         </p>
       </div>
 
       {/* Role badge */}
       <div className="mx-5 mt-2 mb-4 px-3 py-2 bg-surface-lowest/5 border border-white/10 rounded-md flex items-center gap-2">
         <div className={`w-2 h-2 rounded-full ${accentDot} flex-shrink-0`} />
-        <span className="text-xs text-white/90 font-mono truncate">{t(`roles.${role}`)}</span>
+        <span className="text-xs text-white/90 font-mono truncate">{t(`roles.${role}`) || role}</span>
       </div>
 
       {/* Navigation */}
@@ -108,7 +109,7 @@ export default function Sidebar({ role, onLogout }) {
                 }`}
             >
               <Icon size={17} strokeWidth={active ? 2.5 : 2} />
-              <span className={active ? 'font-semibold' : 'font-medium'}>{t(item.labelKey)}</span>
+              <span className={active ? 'font-semibold' : 'font-medium'}>{t(item.labelKey) || item.label}</span>
             </button>
           )
         })}
@@ -123,9 +124,9 @@ export default function Sidebar({ role, onLogout }) {
           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/40 hover:text-white/70 hover:bg-surface-lowest/5 rounded-md transition-all font-data"
         >
           <LogOut size={14} />
-          {t('common.signOut')}
+          {t('common.signOut') || 'Sign out'}
         </button>
-        <p className="text-[10px] text-white/25 font-data mt-2 px-3">{t('common.systemReady')}</p>
+        <p className="text-[10px] text-white/25 font-data mt-2 px-3">{t('common.systemReady') || 'AY 2024–25 · System Ready'}</p>
       </div>
     </aside>
   )
