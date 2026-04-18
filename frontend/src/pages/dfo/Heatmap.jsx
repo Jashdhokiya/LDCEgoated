@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../api'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const LEAKAGE_TYPES = ['DECEASED', 'DUPLICATE', 'UNDRAWN', 'CROSS_SCHEME']
 
 export default function Heatmap() {
+  const { t } = useLanguage()
   const [matrix, setMatrix] = useState(null)
   const [districts, setDistricts] = useState([])
   const [maxVal, setMaxVal] = useState(1)
@@ -53,19 +55,19 @@ export default function Heatmap() {
   const getCellColor = (val, max) => {
     if (!val || val === 0) return 'bg-surface-low text-text-secondary'
     const intensity = val / max
-    if (intensity < 0.2) return 'bg-red-100 text-red-900'
-    if (intensity < 0.4) return 'bg-red-200 text-red-900'
-    if (intensity < 0.6) return 'bg-red-300 text-red-900'
-    if (intensity < 0.8) return 'bg-red-500 text-white'
+    if (intensity < 0.2) return 'bg-red-100 dark:bg-red-950 text-red-900 dark:text-red-200'
+    if (intensity < 0.4) return 'bg-red-200 dark:bg-red-900 text-red-900 dark:text-red-200'
+    if (intensity < 0.6) return 'bg-red-300 dark:bg-red-800 text-red-900 dark:text-red-100'
+    if (intensity < 0.8) return 'bg-red-500 dark:bg-red-700 text-white'
     return 'bg-risk-critical text-white'
   }
 
-  if (loading) return <div className="p-8 text-text-secondary font-data">Loading heatmap...</div>
-  if (!matrix || districts.length === 0) return <div className="p-8 text-text-secondary font-data">Run analysis first to generate heatmap.</div>
+  if (loading) return <div className="p-8 text-text-secondary font-data">{t('heatmap.loadingHeatmap')}</div>
+  if (!matrix || districts.length === 0) return <div className="p-8 text-text-secondary font-data">{t('heatmap.runFirst')}</div>
 
   return (
     <div className="p-8 font-sans">
-      <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight mb-2">Risk Matrix Heatmap</h1>
+      <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight mb-2">{t('heatmap.title')}</h1>
       <p className="text-sm text-text-secondary mb-8 font-data">
         District × Leakage Type — {districts.length} highest-risk districts · ₹{(totalAtRisk / 100000).toFixed(1)}L at risk
       </p>
@@ -74,13 +76,13 @@ export default function Heatmap() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr>
-              <th className="p-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">District</th>
+              <th className="p-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">{t('heatmap.district')}</th>
               {LEAKAGE_TYPES.map((type) => (
                 <th key={type} className="p-3 text-xs font-bold text-text-secondary uppercase tracking-widest text-center font-sans">
                   {type.replace('_', ' ')}
                 </th>
               ))}
-              <th className="p-3 text-xs font-bold text-text-secondary uppercase tracking-widest text-center font-sans">TOTAL</th>
+              <th className="p-3 text-xs font-bold text-text-secondary uppercase tracking-widest text-center font-sans">{t('common.total')}</th>
             </tr>
           </thead>
           <tbody>
@@ -116,26 +118,26 @@ export default function Heatmap() {
 
       {/* Legend */}
       <div className="flex items-center gap-4 mt-6 text-xs font-data text-text-secondary">
-        <span className="font-bold uppercase tracking-wider">Intensity:</span>
+        <span className="font-bold uppercase tracking-wider">{t('heatmap.intensity')}</span>
         <div className="flex items-center gap-1">
           <div className="w-6 h-4 rounded-sm bg-surface-low" />
           <span>0</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-6 h-4 rounded-sm bg-red-100" />
-          <span>Low</span>
+          <span>{t('heatmap.low')}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-6 h-4 rounded-sm bg-red-300" />
-          <span>Medium</span>
+          <span>{t('heatmap.medium')}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-6 h-4 rounded-sm bg-red-500" />
-          <span>High</span>
+          <span>{t('heatmap.high')}</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-6 h-4 rounded-sm bg-risk-critical" />
-          <span>Critical</span>
+          <span>{t('heatmap.critical')}</span>
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import {
   Shield, ChevronRight, Check, X, ScanLine
 } from 'lucide-react'
 import exifr from 'exifr'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 // Gujarat bounding box for coordinate validation
 const GUJARAT_BOUNDS = { latMin: 20.1, latMax: 24.7, lngMin: 68.1, lngMax: 74.5 }
@@ -190,7 +191,7 @@ export default function SubmitEvidence() {
   if (done) {
     return (
       <div className="p-8 max-w-2xl mx-auto font-sans flex flex-col items-center text-center py-20">
-        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mb-5">
+        <div className="w-20 h-20 rounded-full bg-tint-emerald flex items-center justify-center mb-5">
           <CheckCircle size={40} className="text-emerald-600" />
         </div>
         <h2 className="text-2xl font-bold text-text-primary mb-2">Evidence Submitted</h2>
@@ -201,7 +202,7 @@ export default function SubmitEvidence() {
           Submission time: {new Date().toLocaleString('en-IN')} · Reference: EV-{Math.random().toString(36).slice(2, 8).toUpperCase()}
         </p>
         {verifyResult && (
-          <div className={`w-full mb-6 p-4 rounded-xl border ${verifyResult.approved ? 'bg-emerald-50 border-emerald-200' : 'bg-yellow-50 border-yellow-200'}`}>
+          <div className={`w-full mb-6 p-4 rounded-xl border ${verifyResult.approved ? 'bg-tint-emerald border-border-subtle' : 'bg-tint-yellow border-border-subtle'}`}>
             <p className={`text-sm font-bold mb-1 ${verifyResult.approved ? 'text-emerald-700' : 'text-yellow-700'}`}>
               Verification Score: {verifyResult.score}% — {verifyResult.approved ? 'APPROVED' : 'SUBMITTED WITH WARNINGS'}
             </p>
@@ -223,10 +224,10 @@ export default function SubmitEvidence() {
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-text-primary font-sans">Submit Field Evidence</h1>
+          <h1 className="text-xl font-bold text-text-primary font-sans">{t('verifier.submitEvidenceBtn')}</h1>
           <p className="text-xs text-text-secondary font-data">
-            Case <span className="font-mono font-bold">{caseData?.case_id}</span>
-            {' '}· {ANOMALY_LABELS[caseData?.anomaly_type] || caseData?.anomaly_type}
+            {t('queue.case')} <span className="font-mono font-bold">{caseData?.case_id}</span>
+            {' '}· {t(`anomalyLabels.${caseData?.anomaly_type}`) || ANOMALY_LABELS[caseData?.anomaly_type] || caseData?.anomaly_type}
           </p>
         </div>
         <Shield size={18} className="text-text-secondary" />
@@ -277,7 +278,7 @@ export default function SubmitEvidence() {
               </div>
             ))}
           </div>
-          <div className="px-6 py-4 bg-orange-50 border-t border-orange-100">
+          <div className="px-6 py-4 bg-tint-orange border-t border-border-subtle">
             <p className="text-xs text-orange-700 font-data flex items-start gap-2">
               <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
               Submitting false evidence is a criminal offence under the Indian Penal Code. All submissions are GPS-verified and timestamped.
@@ -301,7 +302,7 @@ export default function SubmitEvidence() {
             onDragLeave={() => setDragOver(false)}
             onClick={() => !photoFile && fileRef.current?.click()}
             className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden
-              ${dragOver ? 'border-primary-override bg-blue-50' : photoFile ? 'border-emerald-400 bg-emerald-50/30' : 'border-border-subtle bg-surface-lowest hover:border-primary-override hover:bg-blue-50/20'}`}
+              ${dragOver ? 'border-primary-override bg-tint-blue' : photoFile ? 'border-emerald-400 bg-tint-emerald' : 'border-border-subtle bg-surface-lowest hover:border-primary-override hover:bg-tint-blue'}`}
           >
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
               onChange={e => handleFile(e.target.files?.[0])} />
@@ -333,14 +334,14 @@ export default function SubmitEvidence() {
 
           {/* GPS extraction result */}
           {extracting && (
-            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
+            <div className="flex items-center gap-3 p-4 bg-tint-blue rounded-xl border border-border-subtle">
               <Loader2 size={16} className="animate-spin text-blue-600" />
               <p className="text-sm text-blue-700 font-data">Extracting GPS data from EXIF metadata…</p>
             </div>
           )}
 
           {!extracting && photoFile && (
-            <div className={`p-4 rounded-xl border ${gps ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+            <div className={`p-4 rounded-xl border ${gps ? 'bg-tint-emerald border-border-subtle' : 'bg-tint-red border-border-subtle'}`}>
               <div className="flex items-center gap-2 mb-2">
                 {gps ? <CheckCircle size={16} className="text-emerald-600" /> : <XCircle size={16} className="text-red-500" />}
                 <p className={`text-sm font-bold ${gps ? 'text-emerald-700' : 'text-red-700'}`}>
@@ -376,7 +377,7 @@ export default function SubmitEvidence() {
 
           <div className="flex gap-3">
             <button onClick={() => setStep(0)} className="px-5 py-2.5 border border-border-subtle text-sm font-semibold rounded-xl hover:bg-surface-low transition-all">
-              ← Back
+              ← {t('common.cancel')}
             </button>
             <button onClick={() => setStep(2)} disabled={!canProceedStep1}
               className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:bg-blue-900 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
@@ -411,7 +412,7 @@ export default function SubmitEvidence() {
                     onClick={() => setBeneficiaryPresent(val)}
                     className={`flex-1 py-2.5 text-sm font-bold rounded-lg border-2 transition-all ${
                       beneficiaryPresent === val
-                        ? val ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-red-400 bg-red-50 text-red-700'
+                        ? val ? 'border-emerald-500 bg-tint-emerald text-emerald-600 dark:text-emerald-400' : 'border-red-400 bg-tint-red text-risk-critical'
                         : 'border-border-subtle text-text-secondary hover:border-border-subtle'
                     }`}>
                     {val ? 'Yes — Present' : 'No — Absent'}
@@ -456,7 +457,7 @@ export default function SubmitEvidence() {
 
           <div className="flex gap-3">
             <button onClick={() => setStep(1)} className="px-5 py-2.5 border border-border-subtle text-sm font-semibold rounded-xl hover:bg-surface-low transition-all">
-              ← Back
+              ← {t('common.cancel')}
             </button>
             <button onClick={runVerification} disabled={!canProceedStep2}
               className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:bg-blue-900 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
@@ -470,7 +471,7 @@ export default function SubmitEvidence() {
       {step === 3 && verifyResult && (
         <div className="space-y-4">
           {/* Score banner */}
-          <div className={`rounded-2xl p-5 border-2 ${verifyResult.approved ? 'bg-emerald-50 border-emerald-300' : 'bg-yellow-50 border-yellow-300'}`}>
+          <div className={`rounded-2xl p-5 border-2 ${verifyResult.approved ? 'bg-tint-emerald border-emerald-300' : 'bg-tint-yellow border-yellow-300'}`}>
             <div className="flex items-center justify-between mb-3">
               <div>
                 <p className={`text-xs font-bold uppercase tracking-widest font-data ${verifyResult.approved ? 'text-emerald-600' : 'text-yellow-600'}`}>
@@ -517,7 +518,7 @@ export default function SubmitEvidence() {
           </div>
 
           {verifyResult.hardFails.length > 0 && (
-            <div className="p-4 bg-red-50 rounded-xl border border-red-200">
+            <div className="p-4 bg-tint-red rounded-xl border border-border-subtle">
               <p className="text-sm font-bold text-red-700 mb-1">Cannot Submit</p>
               <ul className="text-xs text-red-600 font-data space-y-0.5">
                 {verifyResult.hardFails.map(f => <li key={f.id}>• {f.label}: {f.detail}</li>)}
@@ -530,7 +531,7 @@ export default function SubmitEvidence() {
 
           <div className="flex gap-3">
             <button onClick={() => setStep(2)} className="px-5 py-2.5 border border-border-subtle text-sm font-semibold rounded-xl hover:bg-surface-low transition-all">
-              ← Back
+              ← {t('common.cancel')}
             </button>
             <button
               onClick={handleSubmit}

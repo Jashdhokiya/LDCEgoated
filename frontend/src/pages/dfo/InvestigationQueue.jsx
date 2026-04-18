@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api'
 import { RiskBadge, LeakageBadge } from '../../components/RiskBadge'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 export default function InvestigationQueue() {
+  const { t } = useLanguage()
   const [flags, setFlags] = useState([])
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
@@ -36,23 +38,23 @@ export default function InvestigationQueue() {
 
   return (
     <div className="p-8">
-      <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight mb-6">Investigation Queue</h1>
+      <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight mb-6">{t('queue.title')}</h1>
       
       <div className="bg-surface-lowest rounded-lg shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-text-secondary font-data">Loading flags...</div>
+          <div className="p-8 text-center text-text-secondary font-data">{t('queue.loadingFlags')}</div>
         ) : (
           <table className="w-full text-left">
             <thead>
               <tr className="bg-surface text-text-secondary text-sm font-bold uppercase tracking-widest font-sans">
-                <th className="p-4 font-bold">Flag ID</th>
-                <th className="p-4 font-bold">Beneficiary</th>
-                <th className="p-4 font-bold">District / Scheme</th>
-                <th className="p-4 font-bold">Leakage Type</th>
-                <th className="p-4 font-bold">Amount</th>
-                <th className="p-4 font-bold">Risk Score</th>
-                <th className="p-4 font-bold">Status</th>
-                <th className="p-4 font-bold">Action</th>
+                <th className="p-4 font-bold">{t('queue.flagId')}</th>
+                <th className="p-4 font-bold">{t('queue.beneficiary')}</th>
+                <th className="p-4 font-bold">{t('queue.districtScheme')}</th>
+                <th className="p-4 font-bold">{t('queue.leakageType')}</th>
+                <th className="p-4 font-bold">{t('queue.amount')}</th>
+                <th className="p-4 font-bold">{t('queue.riskScore')}</th>
+                <th className="p-4 font-bold">{t('queue.status')}</th>
+                <th className="p-4 font-bold">{t('queue.action')}</th>
               </tr>
             </thead>
             <tbody className="font-data text-sm">
@@ -93,14 +95,14 @@ export default function InvestigationQueue() {
                       onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} 
                       className="text-primary-override hover:underline font-sans font-semibold text-sm"
                     >
-                      Review
+                      {t('common.review')}
                     </button>
                   </td>
                 </tr>
               ))}
               {flags.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-text-secondary">No flags found. Run an analysis first.</td>
+                  <td colSpan="8" className="p-8 text-center text-text-secondary">{t('queue.noFlags')}</td>
                 </tr>
               )}
             </tbody>

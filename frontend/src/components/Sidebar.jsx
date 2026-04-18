@@ -1,5 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Shield, LayoutDashboard, List, Map, FileText, Building2, AlertTriangle, BookOpen, BarChart3, LogOut, UserCircle } from 'lucide-react'
+import ThemeToggle from './ThemeToggle'
+import LanguageToggle from './LanguageToggle'
+import { useLanguage } from '../i18n/LanguageContext'
 
 const DFO_NAV = [
   { path: '/dfo/dashboard',            label: 'Overview',            icon: LayoutDashboard },
@@ -36,14 +39,6 @@ const NAV_BY_ROLE = {
   AUDIT_OFFICER:   AUDIT_NAV,
   SCHEME_VERIFIER: VERIFIER_NAV,
   USER:            USER_NAV,
-}
-
-const ROLE_LABELS = {
-  DFO:             'DFO — Ahmedabad',
-  STATE_ADMIN:     'State Admin — Gujarat',
-  AUDIT_OFFICER:   'Audit Officer',
-  SCHEME_VERIFIER: 'Scheme Verifier',
-  USER:            'Beneficiary',
 }
 
 const ROLE_ACCENT = {
@@ -84,17 +79,17 @@ export default function Sidebar({ role, onLogout }) {
       <div className="p-5 pt-8">
         <div className="flex items-center gap-3 mb-2">
           <Shield className="text-blue-400" size={26} strokeWidth={2.5} />
-          <span className="font-bold text-xl tracking-tight font-sans">EduGuard</span>
+          <span className="font-bold text-xl tracking-tight font-sans">{t('sidebar.brand')}</span>
         </div>
         <p className="text-xs text-white/50 leading-relaxed font-data">
-          Government of Gujarat<br />DBT Leakage Detection
+          {t('common.govGujarat')}<br />{t('common.dbtLeakage')}
         </p>
       </div>
 
       {/* Role badge */}
       <div className="mx-5 mt-2 mb-4 px-3 py-2 bg-surface-lowest/5 border border-white/10 rounded-md flex items-center gap-2">
         <div className={`w-2 h-2 rounded-full ${accentDot} flex-shrink-0`} />
-        <span className="text-xs text-white/90 font-mono truncate">{ROLE_LABELS[role]}</span>
+        <span className="text-xs text-white/90 font-mono truncate">{t(`roles.${role}`)}</span>
       </div>
 
       {/* Navigation */}
@@ -113,22 +108,24 @@ export default function Sidebar({ role, onLogout }) {
                 }`}
             >
               <Icon size={17} strokeWidth={active ? 2.5 : 2} />
-              <span className={active ? 'font-semibold' : 'font-medium'}>{item.label}</span>
+              <span className={active ? 'font-semibold' : 'font-medium'}>{t(item.labelKey)}</span>
             </button>
           )
         })}
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 space-y-0.5">
+        <LanguageToggle variant="sidebar" />
+        <ThemeToggle variant="sidebar" />
         <button
           onClick={onLogout}
           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/40 hover:text-white/70 hover:bg-surface-lowest/5 rounded-md transition-all font-data"
         >
           <LogOut size={14} />
-          Sign out
+          {t('common.signOut')}
         </button>
-        <p className="text-[10px] text-white/25 font-data mt-2 px-3">AY 2024–25 · System Ready</p>
+        <p className="text-[10px] text-white/25 font-data mt-2 px-3">{t('common.systemReady')}</p>
       </div>
     </aside>
   )

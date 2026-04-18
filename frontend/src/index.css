@@ -2,6 +2,8 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Public Sans", "Noto Sans Gujarati", sans-serif;
   --font-data: "Inter", sans-serif;
@@ -11,6 +13,7 @@
   --color-workspace: #f8f9ff;
   --color-surface-lowest: #ffffff;
   --color-surface-low: #eef4ff;
+  --color-surface: #f1f5f9;
 
   --color-primary-override: #1B3A5B;
   --color-secondary-override: #6B7280;
@@ -19,6 +22,8 @@
   --color-text-primary: #0f1c2c;
   --color-text-secondary: #44474c;
   --color-text-inverse: #ffffff;
+
+  --color-border-subtle: #e2e8f0;
 
   --color-leakage-deceased: #E63946;
   --color-leakage-duplicate: #F5A623;
@@ -30,15 +35,68 @@
   --color-risk-medium: #EAB308;
   --color-risk-low: #2DC653;
 
+  /* Status / tinted backgrounds */
+  --color-tint-blue: #eff6ff;
+  --color-tint-red: #fef2f2;
+  --color-tint-green: #f0fdf4;
+  --color-tint-yellow: #fefce8;
+  --color-tint-orange: #fff7ed;
+  --color-tint-violet: #f5f3ff;
+  --color-tint-emerald: #ecfdf5;
+
   /* Role-specific accents */
   --color-dfo-accent: #1B3A5B;
   --color-admin-accent: #5B21B6;
   --color-admin-shell: #1a0533;
 }
 
+/* ── Dark mode overrides ─────────────────────────────────────────────── */
+.dark {
+  --color-workspace: #0f172a;
+  --color-surface-lowest: #1e293b;
+  --color-surface-low: #1a2332;
+  --color-surface: #253347;
+
+  --color-text-primary: #e2e8f0;
+  --color-text-secondary: #94a3b8;
+
+  --color-border-subtle: #334155;
+
+  --color-primary-override: #3b82f6;
+
+  /* Tinted backgrounds — dark versions */
+  --color-tint-blue: #172554;
+  --color-tint-red: #450a0a;
+  --color-tint-green: #052e16;
+  --color-tint-yellow: #422006;
+  --color-tint-orange: #431407;
+  --color-tint-violet: #2e1065;
+  --color-tint-emerald: #022c22;
+
+  --color-shell: #0b1120;
+}
+
 @layer base {
   body {
     @apply bg-shell text-text-primary font-sans antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Dark mode overrides for form elements */
+  .dark input, .dark select, .dark textarea {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-lowest);
+    border-color: var(--color-border-subtle);
+  }
+
+  .dark input::placeholder, .dark textarea::placeholder {
+    color: var(--color-text-secondary);
+  }
+
+  /* Dark mode option elements */
+  .dark option {
+    background-color: var(--color-surface-lowest);
+    color: var(--color-text-primary);
   }
 }
 
@@ -50,4 +108,17 @@
 .district-path:hover {
   opacity: 0.85;
   filter: brightness(1.15);
+}
+
+/* Theme transition helpers */
+.theme-transition,
+.theme-transition *:not([class*="animate-"]) {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Recharts tooltip dark mode */
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: var(--color-surface-lowest) !important;
+  border: 1px solid var(--color-border-subtle) !important;
+  color: var(--color-text-primary) !important;
 }
