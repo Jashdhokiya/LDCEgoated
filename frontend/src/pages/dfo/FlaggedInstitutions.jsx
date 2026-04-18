@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react'
 import { AlertTriangle, ExternalLink, FileSearch, Loader2 } from 'lucide-react'
 import { getInstitutions } from '../../api'
 import AssignCaseModal from '../../components/AssignCaseModal'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const RISK_BG = (score) => {
-  if (score >= 75) return 'border-l-4 border-risk-critical bg-red-50/40'
-  if (score >= 50) return 'border-l-4 border-risk-high bg-orange-50/40'
-  return 'border-l-4 border-risk-medium bg-yellow-50/20'
+  if (score >= 75) return 'border-l-4 border-risk-critical bg-tint-red'
+  if (score >= 50) return 'border-l-4 border-risk-high bg-tint-orange'
+  return 'border-l-4 border-risk-medium bg-tint-yellow'
 }
 
 export default function FlaggedInstitutions() {
+  const { t } = useLanguage()
   const [flagged, setFlagged] = useState([])
   const [loading, setLoading] = useState(true)
   const [assignModal, setAssignModal] = useState(null)
@@ -32,15 +34,15 @@ export default function FlaggedInstitutions() {
         <div>
           <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight flex items-center gap-3">
             <AlertTriangle size={26} className="text-risk-critical" />
-            Flagged Institutions
+            {t('flaggedInst.title')}
           </h1>
           <p className="text-sm text-text-secondary mt-1 font-data">
-            {flagged.length} institutions with active risk flags in Ahmedabad District
+            {flagged.length} {t('flaggedInst.subtitle')}
           </p>
         </div>
-        <div className="px-5 py-3 bg-red-50 rounded-xl border border-red-200 text-center">
+        <div className="px-5 py-3 bg-tint-red rounded-xl border border-border-subtle text-center">
           <p className="text-3xl font-bold text-risk-critical font-sans">{flagged.length}</p>
-          <p className="text-xs text-red-400 font-data">Flagged</p>
+          <p className="text-xs text-risk-critical font-data">{t('common.flagged')}</p>
         </div>
       </div>
 
@@ -60,7 +62,7 @@ export default function FlaggedInstitutions() {
                   <p className="text-sm text-text-secondary font-data mt-0.5">{inst.taluka}, Ahmedabad · {inst.beneficiary_count} beneficiaries</p>
 
                   {/* Flag reason */}
-                  <div className="flex items-start gap-2 mt-3 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  <div className="flex items-start gap-2 mt-3 bg-tint-red border border-border-subtle rounded-lg px-3 py-2">
                     <AlertTriangle size={14} className="text-risk-critical mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-risk-critical font-data font-medium">{inst.risk_profile.flag_reason}</p>
                   </div>
@@ -78,13 +80,13 @@ export default function FlaggedInstitutions() {
                     <p className="text-2xl font-bold text-text-primary font-sans">
                       ₹{(inst.financial_ledger.current_holding / 1000).toFixed(0)}K
                     </p>
-                    <p className="text-xs text-text-secondary font-data">Holding</p>
+                    <p className="text-xs text-text-secondary font-data">{t('middlemen.holding')}</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-text-primary font-sans">
                       ₹{(inst.financial_ledger.total_funds_credited / 100000).toFixed(1)}L
                     </p>
-                    <p className="text-xs text-text-secondary font-data">Credited</p>
+                    <p className="text-xs text-text-secondary font-data">{t('middlemen.credited')}</p>
                   </div>
                 </div>
               </div>
@@ -96,19 +98,19 @@ export default function FlaggedInstitutions() {
                   className="flex items-center gap-2 px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-all"
                 >
                   <FileSearch size={13} />
-                  Assign to Verifier
+                  {t('flaggedInst.assignToVerifier')}
                 </button>
                 <button
                   onClick={() => setReferred(s => new Set([...s, inst.institution_id]))}
                   disabled={referred.has(inst.institution_id)}
                   className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
                     referred.has(inst.institution_id)
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-600 cursor-not-allowed'
+                      ? 'border-border-subtle bg-tint-emerald text-emerald-600 cursor-not-allowed'
                       : 'border-border-subtle text-text-secondary hover:border-border-subtle hover:bg-surface-low'
                   }`}
                 >
                   <ExternalLink size={13} />
-                  {referred.has(inst.institution_id) ? 'Referred to Audit ✓' : 'Refer to Audit Team'}
+                  {referred.has(inst.institution_id) ? t('flaggedInst.referredAudit') : t('flaggedInst.referToAudit')}
                 </button>
               </div>
             </div>

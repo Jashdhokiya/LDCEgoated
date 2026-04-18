@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { Building2, AlertTriangle, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus, Loader2 } from 'lucide-react'
 import { getInstitutions } from '../../api'
 import AssignCaseModal from '../../components/AssignCaseModal'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const TYPE_COLORS = {
-  SCHOOL: 'bg-blue-100 text-blue-700',
-  COLLEGE: 'bg-violet-100 text-violet-700',
-  GRAM_PANCHAYAT: 'bg-emerald-100 text-emerald-700',
+  SCHOOL: 'bg-tint-blue text-primary-override',
+  COLLEGE: 'bg-tint-violet text-text-primary',
+  GRAM_PANCHAYAT: 'bg-tint-emerald text-text-primary',
 }
 
 function RiskScore({ score }) {
@@ -17,6 +18,7 @@ function RiskScore({ score }) {
 }
 
 export default function MiddlemenList() {
+  const { t } = useLanguage()
   const [institutions, setInstitutions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -64,42 +66,42 @@ export default function MiddlemenList() {
         <div>
           <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight flex items-center gap-3">
             <Building2 size={28} className="text-primary-override" />
-            Middlemen Registry
+            {t('middlemen.title')}
           </h1>
           <p className="text-sm text-text-secondary mt-1 font-data">
-            All institutions (schools, colleges, gram panchayats) under Ahmedabad District
+            {t('middlemen.subtitle')}
           </p>
         </div>
         <div className="flex gap-3 text-sm font-data">
           <div className="px-4 py-2 bg-surface-lowest rounded-lg border border-border-subtle shadow-sm text-center">
             <p className="text-2xl font-bold text-text-primary font-sans">{institutions.length}</p>
-            <p className="text-xs text-text-secondary">Total</p>
+            <p className="text-xs text-text-secondary">{t('common.total')}</p>
           </div>
-          <div className="px-4 py-2 bg-red-50 rounded-lg border border-red-100 shadow-sm text-center">
+          <div className="px-4 py-2 bg-tint-red rounded-lg border border-border-subtle shadow-sm text-center">
             <p className="text-2xl font-bold text-risk-critical font-sans">{institutions.filter(i => i.risk_profile.is_flagged).length}</p>
-            <p className="text-xs text-red-400">Flagged</p>
+            <p className="text-xs text-risk-critical">{t('common.flagged')}</p>
           </div>
         </div>
       </div>
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-100">
+        <div className="flex items-center justify-center h-64 bg-surface-lowest rounded-xl shadow-sm border border-border-subtle">
           <div className="text-center">
             <Loader2 size={32} className="animate-spin text-primary-override mx-auto mb-3" />
-            <p className="text-sm text-text-secondary font-data">Loading institutions…</p>
+            <p className="text-sm text-text-secondary font-data">{t('middlemen.loadingInst')}</p>
           </div>
         </div>
       )}
 
       {/* Error / Empty */}
       {!loading && error && (
-        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-100">
-          <Building2 size={40} className="text-gray-300 mb-3" />
-          <p className="text-sm font-bold text-text-primary font-sans mb-1">No institutions loaded</p>
-          <p className="text-xs text-text-secondary font-data mb-4">Backend may be starting up. Try again.</p>
+        <div className="flex flex-col items-center justify-center h-64 bg-surface-lowest rounded-xl shadow-sm border border-border-subtle">
+          <Building2 size={40} className="text-text-secondary mb-3" />
+          <p className="text-sm font-bold text-text-primary font-sans mb-1">{t('middlemen.noInstitutions')}</p>
+          <p className="text-xs text-text-secondary font-data mb-4">{t('middlemen.noInstSub')}</p>
           <button onClick={fetchInstitutions} className="px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-all">
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       )}
@@ -109,18 +111,18 @@ export default function MiddlemenList() {
         <table className="w-full text-left">
           <thead className="bg-surface-low border-b border-border-subtle">
             <tr>
-              <th className="px-5 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">Institution</th>
-              <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">Type</th>
+              <th className="px-5 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">{t('middlemen.institution')}</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">{t('middlemen.type')}</th>
               <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans cursor-pointer hover:text-text-primary" onClick={() => toggleSort('financial_ledger.total_funds_credited')}>
-                <div className="flex items-center gap-1">Credited <SortIcon k="financial_ledger.total_funds_credited" /></div>
+                <div className="flex items-center gap-1">{t('middlemen.credited')} <SortIcon k="financial_ledger.total_funds_credited" /></div>
               </th>
               <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans cursor-pointer hover:text-text-primary" onClick={() => toggleSort('financial_ledger.current_holding')}>
-                <div className="flex items-center gap-1">Holding <SortIcon k="financial_ledger.current_holding" /></div>
+                <div className="flex items-center gap-1">{t('middlemen.holding')} <SortIcon k="financial_ledger.current_holding" /></div>
               </th>
               <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans cursor-pointer hover:text-text-primary" onClick={() => toggleSort('risk_profile.risk_score')}>
-                <div className="flex items-center gap-1">Risk <SortIcon k="risk_profile.risk_score" /></div>
+                <div className="flex items-center gap-1">{t('middlemen.risk')} <SortIcon k="risk_profile.risk_score" /></div>
               </th>
-              <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">Status</th>
+              <th className="px-4 py-3.5 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">{t('queue.status')}</th>
               <th className="px-4 py-3.5"></th>
             </tr>
           </thead>
@@ -129,7 +131,7 @@ export default function MiddlemenList() {
               <>
                 <tr
                   key={inst.institution_id}
-                  className={`${idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low/50'} hover:bg-blue-50/40 transition-colors cursor-pointer border-b border-border-subtle`}
+                  className={`${idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low/50'} hover:bg-tint-blue/40 transition-colors cursor-pointer border-b border-border-subtle`}
                   onClick={() => setExpanded(expanded === inst.institution_id ? null : inst.institution_id)}
                 >
                   <td className="px-5 py-4">
@@ -155,10 +157,10 @@ export default function MiddlemenList() {
                   <td className="px-4 py-4">
                     {inst.risk_profile.is_flagged ? (
                       <span className="flex items-center gap-1.5 text-xs font-bold text-risk-critical font-data">
-                        <AlertTriangle size={13} /> Flagged
+                        <AlertTriangle size={13} /> {t('common.flagged')}
                       </span>
                     ) : (
-                      <span className="text-xs font-bold text-risk-low font-data">Clear</span>
+                      <span className="text-xs font-bold text-risk-low font-data">{t('common.clear')}</span>
                     )}
                   </td>
                   <td className="px-4 py-4">
@@ -168,7 +170,7 @@ export default function MiddlemenList() {
                           onClick={e => { e.stopPropagation(); setAssignModal(inst) }}
                           className="text-xs font-semibold text-primary-override hover:underline font-sans"
                         >
-                          Assign →
+                          {t('middlemen.assign')}
                         </button>
                       )}
                       {expanded === inst.institution_id ? <ChevronUp size={16} className="text-text-secondary" /> : <ChevronDown size={16} className="text-text-secondary/70" />}
@@ -176,22 +178,22 @@ export default function MiddlemenList() {
                   </td>
                 </tr>
                 {expanded === inst.institution_id && (
-                  <tr key={`${inst.institution_id}-expanded`} className="bg-blue-50/50">
+                  <tr key={`${inst.institution_id}-expanded`} className="bg-tint-blue">
                     <td colSpan={7} className="px-6 py-5">
                       <div className="grid grid-cols-3 gap-6">
                         <div>
-                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 font-data">Financial Ledger</p>
+                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 font-data">{t('middlemen.financialLedger')}</p>
                           <div className="space-y-1.5 font-data text-sm">
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">Total Credited</span>
+                              <span className="text-text-secondary">{t('middlemen.totalCredited')}</span>
                               <span className="font-mono font-bold text-text-primary">₹{inst.financial_ledger.total_funds_credited.toLocaleString('en-IN')}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">Total Debited</span>
+                              <span className="text-text-secondary">{t('middlemen.totalDebited')}</span>
                               <span className="font-mono font-bold text-text-primary">₹{inst.financial_ledger.total_funds_debited.toLocaleString('en-IN')}</span>
                             </div>
-                            <div className="flex justify-between border-t border-blue-100 pt-1.5">
-                              <span className="font-bold text-text-primary">Current Holding</span>
+                            <div className="flex justify-between border-t border-border-subtle pt-1.5">
+                              <span className="font-bold text-text-primary">{t('middlemen.currentHolding')}</span>
                               <span className={`font-mono font-bold ${inst.financial_ledger.current_holding > 100000 ? 'text-risk-critical' : 'text-risk-low'}`}>
                                 ₹{inst.financial_ledger.current_holding.toLocaleString('en-IN')}
                               </span>
@@ -199,36 +201,36 @@ export default function MiddlemenList() {
                           </div>
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 font-data">Risk Profile</p>
+                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 font-data">{t('middlemen.riskProfile')}</p>
                           <div className="space-y-1.5 font-data text-sm">
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">Risk Score</span>
+                              <span className="text-text-secondary">{t('middlemen.risk')}</span>
                               <RiskScore score={inst.risk_profile.risk_score} />
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">Status</span>
+                              <span className="text-text-secondary">{t('queue.status')}</span>
                               <span className={`font-bold ${inst.risk_profile.is_flagged ? 'text-risk-critical' : 'text-risk-low'}`}>
                                 {inst.risk_profile.is_flagged ? 'FLAGGED' : 'CLEAR'}
                               </span>
                             </div>
                             {inst.risk_profile.flag_reason && (
-                              <p className="text-xs text-risk-critical mt-1 bg-red-50 p-2 rounded">{inst.risk_profile.flag_reason}</p>
+                              <p className="text-xs text-risk-critical mt-1 bg-tint-red p-2 rounded">{inst.risk_profile.flag_reason}</p>
                             )}
                           </div>
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 font-data">Institution Details</p>
+                          <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-2 font-data">{t('middlemen.institutionDetails')}</p>
                           <div className="space-y-1.5 font-data text-sm">
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">ID</span>
+                              <span className="text-text-secondary">{t('middlemen.id')}</span>
                               <span className="font-mono text-xs text-text-primary">{inst.institution_id}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">Beneficiaries</span>
+                              <span className="text-text-secondary">{t('common.beneficiaries')}</span>
                               <span className="font-bold text-text-primary">{inst.beneficiary_count}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-text-secondary">Taluka</span>
+                              <span className="text-text-secondary">{t('middlemen.taluka')}</span>
                               <span className="font-bold text-text-primary">{inst.taluka}</span>
                             </div>
                           </div>

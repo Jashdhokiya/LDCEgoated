@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { MapPin, FileImage, List, Clock, AlertTriangle, CheckCircle, ChevronRight, Loader2 } from 'lucide-react'
 import { getInvestigations } from '../../api'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const ANOMALY_LABELS = {
   DEAD_BENEFICIARY: 'Deceased Beneficiary',
@@ -10,13 +11,14 @@ const ANOMALY_LABELS = {
 }
 
 const PRIORITY = {
-  DEAD_BENEFICIARY: { label: 'Critical', color: 'bg-red-100 text-red-700 border-red-200' },
-  DUPLICATE: { label: 'High', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  UNDRAWN: { label: 'Medium', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  CROSS_SCHEME: { label: 'Medium', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  DEAD_BENEFICIARY: { label: 'Critical', color: 'bg-tint-red text-risk-critical border-border-subtle' },
+  DUPLICATE: { label: 'High', color: 'bg-tint-orange text-risk-high border-border-subtle' },
+  UNDRAWN: { label: 'Medium', color: 'bg-tint-yellow text-risk-medium border-border-subtle' },
+  CROSS_SCHEME: { label: 'Medium', color: 'bg-tint-blue text-primary-override border-border-subtle' },
 }
 
 export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
+  const { t } = useLanguage()
   const [cases, setCases] = useState([])
   const [submitted, setSubmitted] = useState(new Set())
 
@@ -44,15 +46,15 @@ export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
     <div className="p-8 pb-20 font-sans max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary tracking-tight">Field Verification Queue</h1>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">{t('verifier.title')}</h1>
           <p className="text-sm text-text-secondary mt-1 font-data">
-            Your assigned cases — submit GPS-tagged photo evidence for each
+            {t('verifier.subtitle')}
           </p>
         </div>
         <div className="flex gap-3">
           {[
-            { label: 'Pending', value: pending.length, color: 'text-orange-600' },
-            { label: 'Submitted', value: done.length, color: 'text-emerald-600' },
+            { label: t('verifier.pending'), value: pending.length, color: 'text-orange-600' },
+            { label: t('verifier.submitted'), value: done.length, color: 'text-emerald-600' },
           ].map(s => (
             <div key={s.label} className="px-4 py-2.5 bg-surface-lowest rounded-xl border border-border-subtle shadow-sm text-center min-w-[80px]">
               <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -66,11 +68,11 @@ export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
       <div className="mb-8">
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle size={16} className="text-orange-500" />
-          <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest font-data">Pending Evidence Submission</h2>
+          <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest font-data">{t('verifier.pendingSubmission')}</h2>
         </div>
         {pending.length === 0 ? (
           <div className="bg-surface-lowest rounded-xl border border-border-subtle p-8 text-center text-text-secondary font-data text-sm">
-            No pending cases. All caught up!
+            {t('verifier.noPending')}
           </div>
         ) : (
           <div className="space-y-3">
@@ -90,11 +92,11 @@ export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
                     <h3 className="font-bold text-text-primary text-sm">{c.target_entity?.name || c.target_entity?.entity_id}</h3>
                     <div className="flex items-center gap-4 mt-1.5 text-xs text-text-secondary font-data">
                       <span className="flex items-center gap-1"><MapPin size={11} />{c.district}</span>
-                      <span>{ANOMALY_LABELS[c.anomaly_type]}</span>
+                      <span>{t(`anomalyLabels.${c.anomaly_type}`) || ANOMALY_LABELS[c.anomaly_type]}</span>
                       <span className="font-mono text-risk-critical">₹{(c.amount || 0).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex items-center gap-1 mt-1 text-[11px] text-text-secondary font-data">
-                      <Clock size={10} />Assigned: {c.assigned_date}
+                      <Clock size={10} />{t('verifier.assigned')}: {c.assigned_date}
                     </div>
                   </div>
 
@@ -102,7 +104,7 @@ export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
                     onClick={() => onSubmitEvidence(c)}
                     className="flex items-center gap-2 px-4 py-2.5 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-colors shadow-sm whitespace-nowrap"
                   >
-                    <FileImage size={14} /> Submit Evidence <ChevronRight size={13} />
+                    <FileImage size={14} /> {t('verifier.submitEvidenceBtn')} <ChevronRight size={13} />
                   </button>
                 </div>
               )
@@ -116,7 +118,7 @@ export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle size={16} className="text-emerald-500" />
-            <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest font-data">Submitted</h2>
+            <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest font-data">{t('verifier.submitted')}</h2>
           </div>
           <div className="space-y-2">
             {done.map(c => (
@@ -126,8 +128,8 @@ export default function SchemeVerifierDashboard({ onSubmitEvidence }) {
                   <span className="text-xs font-mono text-text-secondary">{c.case_id}</span>
                   <p className="text-sm font-bold text-text-primary">{c.target_entity?.name || c.target_entity?.entity_id}</p>
                 </div>
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 flex items-center gap-1.5">
-                  <CheckCircle size={12} /> Submitted
+                <span className="text-xs font-bold text-emerald-600 bg-tint-emerald px-3 py-1.5 rounded-full border border-border-subtle flex items-center gap-1.5">
+                  <CheckCircle size={12} /> {t('verifier.submitted')}
                 </span>
               </div>
             ))}

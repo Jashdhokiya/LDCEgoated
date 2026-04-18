@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { api } from '../../api'
 import { LeakageBadge } from '../../components/RiskBadge'
 import { Sparkles, Loader2 } from 'lucide-react'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 export default function CaseDetail({ flagId }) {
+  const { t } = useLanguage()
   const [flag, setFlag] = useState(null)
   const [loading, setLoading] = useState(true)
   const [aiLoading, setAiLoading] = useState(false)
@@ -43,8 +45,8 @@ export default function CaseDetail({ flagId }) {
     }
   }
 
-  if (loading) return <div className="p-8 text-text-secondary font-data">Loading case file...</div>
-  if (!flag) return <div className="p-8 text-text-secondary font-data">Case not found.</div>
+  if (loading) return <div className="p-8 text-text-secondary font-data">{t('caseDetail.loadingCase')}</div>
+  if (!flag) return <div className="p-8 text-text-secondary font-data">{t('caseDetail.caseNotFound')}</div>
 
   const getBannerColor = (label) => {
     if (label === 'CRITICAL') return 'bg-risk-critical'
@@ -77,14 +79,14 @@ export default function CaseDetail({ flagId }) {
 
           <div className="bg-surface-lowest border border-border-subtle rounded-sm p-6 shadow-[inset_0_0_20px_rgba(0,0,0,0.02)]">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-widest text-text-secondary font-sans">Evidence Record</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-text-secondary font-sans">{t('caseDetail.evidenceRecord')}</span>
               <button
                 onClick={handleGenerateAIEvidence}
                 disabled={aiLoading || evidenceSource === 'ai'}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold font-sans rounded-sm bg-gradient-to-b from-primary-override to-shell text-white hover:shadow-md disabled:opacity-50 transition-all"
               >
                 {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                {aiLoading ? 'Generating...' : evidenceSource === 'ai' ? 'AI Evidence ✓' : 'Generate AI Evidence'}
+                {aiLoading ? t('caseDetail.generatingAI') : evidenceSource === 'ai' ? t('caseDetail.aiEvidence') : t('caseDetail.generateAI')}
               </button>
             </div>
             <pre className="font-mono text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
@@ -104,14 +106,14 @@ export default function CaseDetail({ flagId }) {
           </div>
 
           <div className="bg-surface-lowest p-6 rounded-lg shadow-sm">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">Data Records</h3>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">{t('caseDetail.dataRecords')}</h3>
             <div className="grid grid-cols-2 gap-4 text-sm font-data">
               <div className="bg-surface-low p-4 rounded">
-                <span className="text-text-secondary block text-xs mb-1 uppercase font-bold">Payment Amount</span>
+                <span className="text-text-secondary block text-xs mb-1 uppercase font-bold">{t('caseDetail.paymentAmount')}</span>
                 <span className="font-mono font-medium text-lg text-text-primary">₹{flag.payment_amount?.toLocaleString('en-IN') || 0}</span>
               </div>
               <div className="bg-surface-low p-4 rounded">
-                <span className="text-text-secondary block text-xs mb-1 uppercase font-bold">Disbursement Date</span>
+                <span className="text-text-secondary block text-xs mb-1 uppercase font-bold">{t('caseDetail.disbursementDate')}</span>
                 <span className="font-medium text-text-primary">{flag.payment_date || 'N/A'}</span>
               </div>
             </div>
@@ -121,34 +123,34 @@ export default function CaseDetail({ flagId }) {
         {/* RIGHT COLUMN (40%) */}
         <div className="w-2/5 flex flex-col gap-6">
           <div className="bg-surface-lowest p-6 rounded-lg shadow-sm text-center">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">Risk Assessment</h3>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">{t('caseDetail.riskAssessment')}</h3>
             <div className={`text-6xl font-bold font-sans ${flag.risk_label === 'CRITICAL' ? 'text-risk-critical' : 'text-primary-override'}`}>
               {flag.risk_score}
             </div>
-            <div className="text-sm font-data font-semibold text-text-secondary mt-2">RISK SCORE / 100</div>
+            <div className="text-sm font-data font-semibold text-text-secondary mt-2">{t('caseDetail.riskScoreOf100')}</div>
           </div>
 
           <div className="bg-surface-lowest p-6 rounded-lg shadow-sm">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">Recommended Action</h3>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">{t('caseDetail.recommendedAction')}</h3>
             <p className="text-sm text-text-primary font-data bg-surface-low p-4 rounded border-l-4 border-primary-override leading-relaxed">
-              {flag.recommended_action || "Manual review required by District Finance Officer."}
+              {flag.recommended_action || t('caseDetail.defaultAction')}
             </p>
           </div>
 
           <div className="bg-surface-lowest p-6 rounded-lg shadow-sm">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">Status Management</h3>
+            <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">{t('caseDetail.statusManagement')}</h3>
             <select 
               value={flag.status || 'OPEN'} 
               onChange={(e) => handleStatusChange(e.target.value)}
               className="w-full bg-surface-lowest border border-border-subtle text-text-primary text-sm rounded p-2.5 mb-4 font-sans font-semibold outline-none focus:ring-2 focus:ring-primary-override"
             >
-              <option value="OPEN">OPEN - Pending Review</option>
-              <option value="ASSIGNED">ASSIGNED - Field Verification</option>
-              <option value="RESOLVED">RESOLVED - Case Closed</option>
+              <option value="OPEN">{t('caseDetail.openPending')}</option>
+              <option value="ASSIGNED">{t('caseDetail.assignedField')}</option>
+              <option value="RESOLVED">{t('caseDetail.resolvedClosed')}</option>
             </select>
 
             <button className="w-full bg-gradient-to-b from-primary-override to-shell text-white text-sm font-bold rounded p-2.5 hover:shadow-lg transition-all shadow-sm">
-              Save Changes
+              {t('caseDetail.saveChanges')}
             </button>
           </div>
         </div>

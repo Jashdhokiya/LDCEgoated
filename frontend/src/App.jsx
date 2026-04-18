@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLanguage } from './i18n/LanguageContext'
 import Sidebar from './components/Sidebar'
 import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
@@ -37,6 +38,7 @@ const DEFAULT_PAGE = {
 }
 
 export default function App() {
+  const { t } = useLanguage()
   // Start restoring immediately if token exists — prevents flash to landing
   const [stage, setStage] = useState(() => tokenStore.get() ? 'restoring' : 'landing')
   const [role, setRole]   = useState(null)
@@ -111,7 +113,7 @@ export default function App() {
     <div className="min-h-screen bg-shell flex items-center justify-center">
       <div className="text-center">
         <div className="w-10 h-10 border-3 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-blue-300 text-sm font-data">Restoring session…</p>
+        <p className="text-blue-300 text-sm font-data">{t('common.restoring')}</p>
       </div>
     </div>
   )

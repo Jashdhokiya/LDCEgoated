@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react'
 import { getSchemes, updateScheme } from '../../api'
 import { BookOpen, ChevronDown, ChevronUp, Edit3, Save, X, CheckCircle, Loader2 } from 'lucide-react'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const STATUS_COLORS = {
-  ACTIVE: 'bg-emerald-100 text-emerald-700',
+  ACTIVE: 'bg-tint-emerald text-emerald-600 dark:text-emerald-400',
   INACTIVE: 'bg-surface-low text-text-secondary',
-  DRAFT: 'bg-yellow-100 text-yellow-700',
+  DRAFT: 'bg-tint-yellow text-yellow-600 dark:text-yellow-400',
 }
 
 const DEPT_COLORS = {
-  Education: 'bg-blue-100 text-blue-700',
-  'Social Justice & Empowerment': 'bg-violet-100 text-violet-700',
+  Education: 'bg-tint-blue text-primary-override',
+  'Social Justice & Empowerment': 'bg-tint-violet text-text-primary',
 }
 
 export default function RulesEngine() {
+  const { t } = useLanguage()
   const [schemes, setSchemes] = useState([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState(null)
@@ -65,20 +67,20 @@ export default function RulesEngine() {
         <div>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight flex items-center gap-3">
             <BookOpen size={26} className="text-violet-600" />
-            Rules Engine
+            {t('rulesEngine.title')}
           </h1>
           <p className="text-sm text-text-secondary mt-1 font-data">
-            Define and manage eligibility rules, mutual exclusions, and scheme parameters
+            {t('rulesEngine.subtitle')}
           </p>
         </div>
         <div className="flex gap-3">
           <div className="px-4 py-2.5 bg-surface-lowest rounded-lg border border-border-subtle shadow-sm text-center">
             <p className="text-xl font-bold font-sans text-text-primary">{totalBeneficiaries.toLocaleString('en-IN')}</p>
-            <p className="text-xs text-text-secondary font-data">Total Beneficiaries</p>
+            <p className="text-xs text-text-secondary font-data">{t('rulesEngine.totalBeneficiaries')}</p>
           </div>
           <div className="px-4 py-2.5 bg-surface-lowest rounded-lg border border-border-subtle shadow-sm text-center">
             <p className="text-xl font-bold font-sans text-text-primary">₹{(totalDisbursed / 10000000).toFixed(1)}Cr</p>
-            <p className="text-xs text-text-secondary font-data">Total Disbursed</p>
+            <p className="text-xs text-text-secondary font-data">{t('rulesEngine.totalDisbursed')}</p>
           </div>
         </div>
       </div>
@@ -105,19 +107,19 @@ export default function RulesEngine() {
                   </div>
                   <h3 className="text-base font-bold text-text-primary">{scheme.name}</h3>
                   <p className="text-xs text-text-secondary font-data mt-0.5">
-                    {scheme.payout_frequency} · ₹{scheme.amount.toLocaleString('en-IN')} per beneficiary · {scheme.beneficiary_count.toLocaleString('en-IN')} active
+                    {scheme.payout_frequency} · ₹{scheme.amount.toLocaleString('en-IN')} {t('rulesEngine.payout')} · {scheme.beneficiary_count.toLocaleString('en-IN')} {t('common.active')}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-3 flex-shrink-0">
                   {isSaved && (
                     <span className="flex items-center gap-1 text-xs text-emerald-600 font-bold font-data animate-pulse">
-                      <CheckCircle size={13} /> Saved
+                      <CheckCircle size={13} /> {t('common.saved')}
                     </span>
                   )}
                   <div className="text-right">
                     <p className="text-base font-bold font-mono text-text-primary">₹{(scheme.total_disbursed / 10000000).toFixed(2)}Cr</p>
-                    <p className="text-xs text-text-secondary font-data">Total disbursed</p>
+                    <p className="text-xs text-text-secondary font-data">{t('rulesEngine.totalDisbursed')}</p>
                   </div>
                   {isExpanded ? <ChevronUp size={18} className="text-text-secondary" /> : <ChevronDown size={18} className="text-text-secondary/70" />}
                 </div>
@@ -130,7 +132,7 @@ export default function RulesEngine() {
                     <div className="grid grid-cols-3 gap-6">
                       {/* Eligibility rules */}
                       <div>
-                        <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">Eligibility Rules</p>
+                        <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">{t('rulesEngine.eligibilityRules')}</p>
                         <div className="space-y-2 font-data text-sm">
                           {Object.entries(scheme.eligibility_rules).map(([k, v]) => (
                             <div key={k} className="flex justify-between gap-2">
@@ -143,13 +145,13 @@ export default function RulesEngine() {
 
                       {/* Mutual exclusions */}
                       <div>
-                        <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">Mutual Exclusions</p>
+                        <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">{t('rulesEngine.mutualExclusions')}</p>
                         {scheme.mutual_exclusions.length === 0 ? (
                           <p className="text-sm text-text-secondary font-data italic">None</p>
                         ) : (
                           <div className="flex flex-wrap gap-2">
                             {scheme.mutual_exclusions.map(ex => (
-                              <span key={ex} className="text-xs font-bold px-2 py-1 bg-red-50 text-red-700 border border-red-100 rounded-lg font-mono">{ex}</span>
+                              <span key={ex} className="text-xs font-bold px-2 py-1 bg-tint-red text-risk-critical border border-border-subtle rounded-lg font-mono">{ex}</span>
                             ))}
                           </div>
                         )}
@@ -157,18 +159,18 @@ export default function RulesEngine() {
 
                       {/* Stats */}
                       <div>
-                        <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">Scheme Stats</p>
+                        <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">{t('rulesEngine.schemeStats')}</p>
                         <div className="space-y-2 font-data text-sm">
                           <div className="flex justify-between">
-                            <span className="text-text-secondary">Payout</span>
+                            <span className="text-text-secondary">{t('rulesEngine.payout')}</span>
                             <span className="font-bold font-mono text-xs">₹{scheme.amount.toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-secondary">Frequency</span>
+                            <span className="text-text-secondary">{t('rulesEngine.frequency')}</span>
                             <span className="font-bold text-xs">{scheme.payout_frequency}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-text-secondary">Beneficiaries</span>
+                            <span className="text-text-secondary">{t('common.beneficiaries')}</span>
                             <span className="font-bold text-xs">{scheme.beneficiary_count.toLocaleString()}</span>
                           </div>
                         </div>
@@ -180,7 +182,7 @@ export default function RulesEngine() {
                           onClick={() => startEdit(scheme)}
                           className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition-all"
                         >
-                          <Edit3 size={13} /> Edit Rules
+                          <Edit3 size={13} /> {t('rulesEngine.editRules')}
                         </button>
                       </div>
                     </div>
@@ -189,7 +191,7 @@ export default function RulesEngine() {
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">Min. Attendance %</label>
+                          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">{t('rulesEngine.minAttendance')}</label>
                           <input
                             type="number"
                             min={0} max={100}
@@ -199,7 +201,7 @@ export default function RulesEngine() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">Gender Target</label>
+                          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">{t('rulesEngine.genderTarget')}</label>
                           <select
                             value={editState.gender_target}
                             onChange={e => setEditState(s => ({ ...s, gender_target: e.target.value }))}
@@ -211,7 +213,7 @@ export default function RulesEngine() {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">Status</label>
+                          <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">{t('queue.status')}</label>
                           <select
                             value={editState.status}
                             onChange={e => setEditState(s => ({ ...s, status: e.target.value }))}
@@ -224,7 +226,7 @@ export default function RulesEngine() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">Mutual Exclusions (comma-separated)</label>
+                        <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-1.5 font-data">{t('rulesEngine.mutualExcComma')}</label>
                         <textarea
                           value={editState.mutual_exclusions}
                           onChange={e => setEditState(s => ({ ...s, mutual_exclusions: e.target.value }))}
@@ -232,20 +234,20 @@ export default function RulesEngine() {
                           placeholder="SCH-NLY, SCH-NSVSY..."
                           className="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm font-mono outline-none focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition-all resize-none"
                         />
-                        <p className="text-xs text-text-secondary font-data mt-1">Enter scheme IDs that cannot be combined with this scheme.</p>
+                        <p className="text-xs text-text-secondary font-data mt-1">{t('rulesEngine.mutualExcHint')}</p>
                       </div>
                       <div className="col-span-2 flex justify-end gap-3 pt-2 border-t border-border-subtle">
                         <button
                           onClick={() => setEditing(null)}
                           className="flex items-center gap-2 px-4 py-2 border border-border-subtle text-xs font-bold text-text-secondary rounded-lg hover:bg-surface-low transition-all"
                         >
-                          <X size={13} /> Cancel
+                          <X size={13} /> {t('common.cancel')}
                         </button>
                         <button
                           onClick={() => saveEdit(scheme.scheme_id)}
                           className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all"
                         >
-                          <Save size={13} /> Save Rules
+                          <Save size={13} /> {t('rulesEngine.saveRules')}
                         </button>
                       </div>
                     </div>

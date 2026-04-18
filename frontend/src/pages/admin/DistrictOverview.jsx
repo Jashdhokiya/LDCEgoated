@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getDistrictStats } from '../../api'
 import { BarChart3, ChevronDown, ChevronUp, Search, Loader2 } from 'lucide-react'
+import { useLanguage } from '../../i18n/LanguageContext'
 
 const LEAKAGE_COLORS = {
   deceased: '#E63946',
@@ -21,6 +22,7 @@ function RiskBar({ value, max, color }) {
 }
 
 export default function DistrictOverview() {
+  const { t } = useLanguage()
   const [allStats, setAllStats] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -66,18 +68,18 @@ export default function DistrictOverview() {
         <div>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight flex items-center gap-3">
             <BarChart3 size={26} className="text-violet-600" />
-            District Overview
+            {t('districtOverview.title')}
           </h1>
           <p className="text-sm text-text-secondary mt-1 font-data">
-            All 33 Gujarat districts ranked by leakage severity
+            {t('districtOverview.subtitle')}
           </p>
         </div>
         <div className="flex gap-3">
           {[
-            { label: 'Total Districts', value: uniqueDistricts.length },
-            { label: 'Total Flags', value: totalFlags, color: 'text-risk-critical' },
-            { label: 'Amount at Risk', value: `₹${(totalRisk / 100000).toFixed(0)}L` },
-            { label: 'Beneficiaries', value: totalBeneficiaries.toLocaleString('en-IN') },
+            { label: t('districtOverview.totalDistricts'), value: uniqueDistricts.length },
+            { label: t('districtOverview.totalFlags'), value: totalFlags, color: 'text-risk-critical' },
+            { label: t('districtOverview.amountAtRisk'), value: `₹${(totalRisk / 100000).toFixed(0)}L` },
+            { label: t('common.beneficiaries'), value: totalBeneficiaries.toLocaleString('en-IN') },
           ].map((s, i) => (
             <div key={i} className="px-4 py-2.5 bg-surface-lowest rounded-lg border border-border-subtle shadow-sm text-center min-w-[100px]">
               <p className={`text-xl font-bold font-sans ${s.color || 'text-text-primary'}`}>{s.value}</p>
@@ -95,10 +97,10 @@ export default function DistrictOverview() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search district..."
-            className="flex-1 text-sm font-data outline-none text-text-primary placeholder:text-text-secondary/70"
+            placeholder={t('districtOverview.searchDistrict')}
+            className="flex-1 text-sm font-data outline-none text-text-primary bg-transparent placeholder:text-text-secondary/70"
           />
-          <span className="text-xs text-text-secondary font-data">{filtered.length} districts</span>
+          <span className="text-xs text-text-secondary font-data">{filtered.length} {t('districtOverview.districts')}</span>
         </div>
 
         {/* Table */}
@@ -107,16 +109,16 @@ export default function DistrictOverview() {
             <tr>
               <th className="px-5 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans w-6">#</th>
               <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans cursor-pointer hover:text-text-primary" onClick={() => toggleSort('district')}>
-                District <SortIcon k="district" />
+                {t('heatmap.district')} <SortIcon k="district" />
               </th>
               <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans cursor-pointer hover:text-text-primary" onClick={() => toggleSort('total_flags')}>
-                Total Flags <SortIcon k="total_flags" />
+                {t('districtOverview.totalFlags')} <SortIcon k="total_flags" />
               </th>
-              <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">Breakdown</th>
+              <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">{t('districtOverview.breakdown')}</th>
               <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans cursor-pointer hover:text-text-primary" onClick={() => toggleSort('amount_at_risk')}>
-                Amount at Risk <SortIcon k="amount_at_risk" />
+                {t('districtOverview.amountAtRisk')} <SortIcon k="amount_at_risk" />
               </th>
-              <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">Top Leakage</th>
+              <th className="px-4 py-3 text-xs font-bold text-text-secondary uppercase tracking-widest font-sans">{t('districtOverview.topLeakage')}</th>
             </tr>
           </thead>
           <tbody>
@@ -130,13 +132,13 @@ export default function DistrictOverview() {
               return (
                 <tr
                   key={d.district}
-                  className={`border-b border-border-subtle hover:bg-violet-50/30 transition-colors cursor-pointer ${isSelected ? 'bg-violet-50/50' : idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low/30'}`}
+                  className={`border-b border-border-subtle hover:bg-tint-violet transition-colors cursor-pointer ${isSelected ? 'bg-tint-violet' : idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low/30'}`}
                   onClick={() => setSelected(isSelected ? null : d.district)}
                 >
                   <td className="px-5 py-3.5 text-xs font-mono text-text-secondary">{idx + 1}</td>
                   <td className="px-4 py-3.5">
                     <p className="text-sm font-bold text-text-primary font-sans">{d.district}</p>
-                    <p className="text-xs text-text-secondary font-data">{d.beneficiaries.toLocaleString()} beneficiaries</p>
+                    <p className="text-xs text-text-secondary font-data">{d.beneficiaries.toLocaleString()} {t('common.beneficiaries')}</p>
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2">
@@ -179,10 +181,10 @@ export default function DistrictOverview() {
                         backgroundColor: LEAKAGE_COLORS[topType.t] + '20',
                         color: LEAKAGE_COLORS[topType.t]
                       }}>
-                        {topType.t.replace('_', ' ').toUpperCase()}
+                        {t(`anomalyLabels.${topType.t.toUpperCase()}`) || topType.t.replace('_', ' ').toUpperCase()}
                       </span>
                     ) : (
-                      <span className="text-xs text-emerald-600 font-bold">Clean</span>
+                      <span className="text-xs text-emerald-600 font-bold">{t('districtOverview.clean')}</span>
                     )}
                   </td>
                 </tr>
@@ -194,12 +196,12 @@ export default function DistrictOverview() {
 
       {/* Legend */}
       <div className="mt-4 flex items-center gap-4 text-xs font-data text-text-secondary">
-        <span className="font-bold">Breakdown key:</span>
+        <span className="font-bold">{t('districtOverview.breakdownKey')}</span>
         {[
-          { label: 'Deceased', color: '#E63946' },
-          { label: 'Duplicate', color: '#F5A623' },
-          { label: 'Undrawn', color: '#EAB308' },
-          { label: 'Cross-Scheme', color: '#3B82F6' },
+          { label: t('gujaratMap.deceased'), color: '#E63946' },
+          { label: t('gujaratMap.duplicate'), color: '#F5A623' },
+          { label: t('gujaratMap.undrawn'), color: '#EAB308' },
+          { label: t('gujaratMap.crossScheme'), color: '#3B82F6' },
         ].map(l => (
           <div key={l.label} className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: l.color }} />
