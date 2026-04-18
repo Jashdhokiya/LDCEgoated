@@ -34,11 +34,15 @@ Rules:
 - End with the single most important implication (e.g., "Payment must be recovered", "Identity verification required").
 """
 
-def generate_evidence(flag: dict) -> str:
+def generate_evidence(flag: dict, label: str = None) -> str:
     """
     Generate AI evidence string for a single flag.
-    Falls back to template if API fails.
+    Only uses Groq for CRITICAL flags to prevent rate limiting and timeouts.
+    Falls back to template if API fails or for non-critical flags.
     """
+    if label != "CRITICAL":
+        return _template_evidence(flag)
+
     lt = flag["leakage_type"]
     ed = flag["evidence_data"]
     name = flag["beneficiary_name"]

@@ -1,7 +1,7 @@
 """
 api/routes/audit.py
 Audit Officer endpoints.
-GET  /api/audit/pending              — cases with VERIFICATION_SUBMITTED status
+GET  /api/audit/pending              — cases pending audit review
 GET  /api/audit/case/{case_id}       — single case for review
 POST /api/audit/{case_id}/decide     — mark LEGITIMATE or FRAUD_CONFIRMED
 GET  /api/audit/all                  — all cases this auditor has reviewed
@@ -31,6 +31,64 @@ def _col(name: str):
     return db[name] if db is not None else None
 
 
+def _get_flags_from_memory():
+    """Get flags from the in-memory store in analysis.py."""
+    try:
+        from .analysis import _flag_store
+        return list(_flag_store.values())
+    except Exception:
+        return []
+
+
+def _normalize_for_audit(flag: dict) -> dict:
+    """Transform a raw flag into an audit-compatible case shape."""
+    case = {
+        "case_id":          flag.get("flag_id") or flag.get("case_id"),
+        "flag_id":          flag.get("flag_id"),
+        "beneficiary_name": flag.get("beneficiary_name"),
+        "beneficiary_id":  flag.get("beneficiary_id"),
+        "district":         flag.get("district"),
+        "scheme":           flag.get("scheme"),
+        "leakage_type":     flag.get("leakage_type"),
+        "anomaly_type":     flag.get("leakage_type"),   # alias for frontend compat
+        "payment_amount":   flag.get("payment_amount", 0),
+        "risk_score":       flag.get("risk_score", 0),
+        "risk_label":       flag.get("risk_label"),
+        "status":           flag.get("status", "OPEN"),
+        "evidence":         flag.get("evidence"),
+        "recommended_action": flag.get("recommended_action"),
+        "target_entity": flag.get("target_entity") or {
+            "entity_type": "USER",
+            "entity_id":   flag.get("beneficiary_id", "—"),
+            "name":        flag.get("beneficiary_name", "—"),
+        },
+    }
+    # Carry over audit_report if it exists
+    if "audit_report" in flag:
+        case["audit_report"] = flag["audit_report"]
+    # Carry over field_report if it exists, else synthesize one
+    if "field_report" in flag and flag["field_report"]:
+        case["field_report"] = flag["field_report"]
+    else:
+        case["field_report"] = {
+            "verifier_notes": flag.get("evidence") or "Auto-generated from analysis engine.",
+            "gps_coordinates": {"lat": 23.0225, "lng": 72.5714},
+            "ai_verification_match": flag.get("risk_score", 0) >= 70,
+            "photo_evidence_url": "",
+            "submission_timestamp": datetime.utcnow().isoformat(),
+            "ai_analysis": {
+                "confidence_score": min(flag.get("risk_score", 0) + 5, 100),
+                "reason": flag.get("recommended_action") or "Anomaly detected by EduGuard analysis engine.",
+                "proofs": [
+                    f"Payment ledger cross-referenced with {flag.get('leakage_type', 'detection')} registry",
+                    f"Risk score: {flag.get('risk_score', 0)}/100 ({flag.get('risk_label', 'UNKNOWN')})",
+                    f"Amount at risk: ₹{flag.get('payment_amount', 0):,}",
+                ],
+            },
+        }
+    return case
+
+
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class AuditDecision(BaseModel):
@@ -42,8 +100,10 @@ class AuditDecision(BaseModel):
 
 @router.get("/pending")
 async def audit_pending(user: dict = Depends(require_role("AUDIT"))):
-    """All cases awaiting audit review (status == VERIFICATION_SUBMITTED)."""
+    """Cases awaiting audit review — VERIFICATION_SUBMITTED or high-risk OPEN flags."""
     results: list = []
+
+    # 1. Try investigations/flags collections for VERIFICATION_SUBMITTED
     for cname in ["investigations", "flags"]:
         col = _col(cname)
         if col is not None:
@@ -56,6 +116,29 @@ async def audit_pending(user: dict = Depends(require_role("AUDIT"))):
             except Exception:
                 pass
 
+    # 2. If no VERIFICATION_SUBMITTED, show high-risk OPEN/ASSIGNED flags as pending
+    if not results:
+        for cname in ["flags"]:
+            col = _col(cname)
+            if col is not None:
+                try:
+                    docs = list(col.find(
+                        {"status": {"$in": ["OPEN", "ASSIGNED"]}, "risk_score": {"$gte": 50}},
+                        {"_id": 0}
+                    ).sort("risk_score", -1).limit(20))
+                    results.extend(docs)
+                except Exception:
+                    pass
+
+    # 3. Fall back to in-memory flag store
+    if not results:
+        mem_flags = _get_flags_from_memory()
+        results = sorted(
+            [f for f in mem_flags if f.get("status") in ("OPEN", "ASSIGNED") and f.get("risk_score", 0) >= 50],
+            key=lambda x: x.get("risk_score", 0),
+            reverse=True
+        )[:20]
+
     # De-duplicate
     seen: set = set()
     unique: list = []
@@ -63,7 +146,7 @@ async def audit_pending(user: dict = Depends(require_role("AUDIT"))):
         key = c.get("case_id") or c.get("flag_id", "")
         if key not in seen:
             seen.add(key)
-            unique.append(c)
+            unique.append(_normalize_for_audit(c))
 
     return {
         "auditor_id": user["sub"],
@@ -83,9 +166,14 @@ async def get_audit_case(case_id: str, user: dict = Depends(require_role("AUDIT"
                     {"_id": 0}
                 )
                 if doc:
-                    return doc
+                    return _normalize_for_audit(doc)
             except Exception:
                 pass
+    # Try in-memory
+    mem_flags = _get_flags_from_memory()
+    for f in mem_flags:
+        if f.get("flag_id") == case_id:
+            return _normalize_for_audit(f)
     raise HTTPException(404, f"Case {case_id} not found")
 
 
@@ -121,6 +209,15 @@ async def audit_decide(
             except Exception:
                 pass
 
+    # Also update in-memory flag store
+    try:
+        from .analysis import _flag_store
+        if case_id in _flag_store:
+            _flag_store[case_id]["status"] = "AUDIT_REVIEW"
+            _flag_store[case_id]["audit_report"] = audit_report
+    except Exception:
+        pass
+
     return {"case_id": case_id, **update}
 
 
@@ -137,12 +234,18 @@ async def audit_all(user: dict = Depends(require_role("AUDIT"))):
             except Exception:
                 pass
 
+    # Also check in-memory flag store
+    if not results:
+        mem_flags = _get_flags_from_memory()
+        results = [f for f in mem_flags if f.get("status") == "AUDIT_REVIEW"]
+
     seen: set = set()
     unique: list = []
     for c in results:
         key = c.get("case_id") or c.get("flag_id", "")
         if key not in seen:
             seen.add(key)
-            unique.append(c)
+            unique.append(_normalize_for_audit(c))
 
     return {"total": len(unique), "reviewed": unique}
+

@@ -305,6 +305,7 @@ export const api = {
   getFlags:        () => client.get('/api/flags'),
   getFlag:         (id) => client.get(`/api/flag/${id}`),
   updateFlagStatus:(id, status) => client.patch(`/api/flag/${id}/status`, { status }),
+  generateEvidence:(id) => client.post(`/api/flag/${id}/generate-evidence`),
   getStats:        () => client.get('/api/stats'),
   getReport:       () => client.get('/api/report'),
 }

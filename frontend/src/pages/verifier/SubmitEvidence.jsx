@@ -6,6 +6,7 @@ import {
   Shield, ChevronRight, Check, X, ScanLine
 } from 'lucide-react'
 import exifr from 'exifr'
+import { submitEvidence as submitEvidenceAPI } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 
 // Gujarat bounding box for coordinate validation
@@ -17,6 +18,7 @@ const isInGujarat = (lat, lng) =>
 
 const ANOMALY_LABELS = {
   DEAD_BENEFICIARY: 'Deceased Beneficiary',
+  DECEASED: 'Deceased Beneficiary',
   DUPLICATE: 'Duplicate Identity',
   UNDRAWN: 'Undrawn Funds',
   CROSS_SCHEME: 'Cross-Scheme Violation',
@@ -176,12 +178,24 @@ export default function SubmitEvidence() {
     setStep(3)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setSubmitting(true)
-    setTimeout(() => {
-      setSubmitting(false)
+    try {
+      await submitEvidenceAPI(caseData?.case_id || caseData?.flag_id, {
+        photo_evidence_url: photoPreview || 'field-evidence-photo.jpg',
+        gps_lat: gps?.latitude || 0,
+        gps_lng: gps?.longitude || 0,
+        verifier_notes: notes,
+        ai_verification_match: verifyResult?.approved ?? null,
+        confidence_score: verifyResult?.score ?? 0,
+      })
       setDone(true)
-    }, 2000)
+    } catch (err) {
+      console.error('Evidence submission failed:', err)
+      alert('Submission failed. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const canProceedStep0 = true
@@ -227,8 +241,8 @@ export default function SubmitEvidence() {
         <div className="flex-1">
           <h1 className="text-xl font-bold text-text-primary font-sans">{t('verifier.submitEvidenceBtn')}</h1>
           <p className="text-xs text-text-secondary font-data">
-            {t('queue.case')} <span className="font-mono font-bold">{caseData?.case_id}</span>
-            {' '}· {t(`anomalyLabels.${caseData?.anomaly_type}`) || ANOMALY_LABELS[caseData?.anomaly_type] || caseData?.anomaly_type}
+            {t('queue.case')} <span className="font-mono font-bold">{caseData?.case_id || caseData?.flag_id}</span>
+            {' '}· {t(`anomalyLabels.${caseData?.anomaly_type || caseData?.leakage_type}`) || ANOMALY_LABELS[caseData?.anomaly_type || caseData?.leakage_type] || caseData?.anomaly_type || caseData?.leakage_type}
           </p>
         </div>
         <Shield size={18} className="text-text-secondary" />
@@ -264,14 +278,14 @@ export default function SubmitEvidence() {
           </div>
           <div className="px-6 py-5 space-y-3">
             {[
-              { label: 'Case ID',       value: caseData?.case_id },
-              { label: 'Beneficiary',   value: caseData?.target_entity?.name || caseData?.target_entity?.entity_id },
-              { label: 'Entity ID',     value: caseData?.target_entity?.entity_id },
-              { label: 'Anomaly Type',  value: ANOMALY_LABELS[caseData?.anomaly_type] || caseData?.anomaly_type },
+              { label: 'Case ID',       value: caseData?.case_id || caseData?.flag_id },
+              { label: 'Beneficiary',   value: caseData?.beneficiary_name || caseData?.target_entity?.name || caseData?.target_entity?.entity_id },
+              { label: 'Entity ID',     value: caseData?.beneficiary_id || caseData?.target_entity?.entity_id },
+              { label: 'Anomaly Type',  value: ANOMALY_LABELS[caseData?.anomaly_type || caseData?.leakage_type] || caseData?.anomaly_type || caseData?.leakage_type },
               { label: 'Scheme',        value: caseData?.scheme },
               { label: 'District',      value: caseData?.district },
-              { label: 'Amount at Risk',value: caseData?.amount ? `₹${caseData.amount.toLocaleString('en-IN')}` : '—' },
-              { label: 'Assigned Date', value: caseData?.assigned_date },
+              { label: 'Amount at Risk',value: (caseData?.amount || caseData?.payment_amount) ? `₹${(caseData.amount || caseData.payment_amount).toLocaleString('en-IN')}` : '—' },
+              { label: 'Assigned Date', value: caseData?.assigned_date || '—' },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0">
                 <span className="text-xs text-text-secondary font-data">{row.label}</span>

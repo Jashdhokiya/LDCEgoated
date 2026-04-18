@@ -97,7 +97,7 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
     for raw in raw_flags:
         score, label, action = compute_risk_score(raw)
         try:
-            evidence = generate_evidence(raw) if generate_evidence else _fallback_evidence(raw)
+            evidence = generate_evidence(raw, label=label) if generate_evidence else _fallback_evidence(raw)
         except Exception:
             evidence = _fallback_evidence(raw)
         enriched.append({**raw, "risk_score": score, "risk_label": label,
@@ -157,6 +157,44 @@ async def get_flag(flag_id: str, user: dict = Depends(require_role("DFO", "STATE
     if flag_id not in _flag_store:
         raise HTTPException(404, "Flag not found")
     return _flag_store[flag_id]
+
+
+@router.post("/api/flag/{flag_id}/generate-evidence")
+async def generate_flag_evidence(flag_id: str,
+                                  user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUDIT"))):
+    """Generate AI evidence for a single flag and persist it."""
+    # Retrieve the flag
+    flag = None
+    col = _col("flags")
+    if col is not None:
+        try:
+            flag = col.find_one({"flag_id": flag_id}, {"_id": 0})
+        except Exception:
+            pass
+    if flag is None:
+        flag = _flag_store.get(flag_id)
+    if flag is None:
+        raise HTTPException(404, "Flag not found")
+
+    # Generate evidence
+    try:
+        from ai_layer.evidence_generator import generate_evidence
+        evidence = generate_evidence(flag, label="CRITICAL")   # force AI path
+        source = "ai"
+    except Exception:
+        evidence = _fallback_evidence(flag)
+        source = "template"
+
+    # Persist the updated evidence
+    if col is not None:
+        try:
+            col.update_one({"flag_id": flag_id}, {"$set": {"evidence": evidence}})
+        except Exception:
+            pass
+    if flag_id in _flag_store:
+        _flag_store[flag_id]["evidence"] = evidence
+
+    return {"evidence": evidence, "source": source}
 
 
 @router.patch("/api/flag/{flag_id}/status")

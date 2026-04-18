@@ -32,11 +32,13 @@ export default function RulesEngine() {
 
   const startEdit = (scheme) => {
     setEditing(scheme.scheme_id)
+    const er = scheme.eligibility_rules || {}
+    const me = Array.isArray(scheme.mutual_exclusions) ? scheme.mutual_exclusions : []
     setEditState({
-      min_attendance_pct: scheme.eligibility_rules.min_attendance_pct,
-      gender_target: scheme.eligibility_rules.gender_target,
-      mutual_exclusions: scheme.mutual_exclusions.join(', '),
-      status: scheme.status,
+      min_attendance_pct: er.min_attendance_pct ?? 75,
+      gender_target: er.gender_target ?? 'ALL',
+      mutual_exclusions: me.join(', '),
+      status: scheme.status || 'ACTIVE',
     })
   }
 
@@ -57,8 +59,8 @@ export default function RulesEngine() {
     setTimeout(() => setSaved(null), 2500)
   }
 
-  const totalBeneficiaries = schemes.reduce((s, sc) => s + sc.beneficiary_count, 0)
-  const totalDisbursed = schemes.reduce((s, sc) => s + sc.total_disbursed, 0)
+  const totalBeneficiaries = schemes.reduce((s, sc) => s + (sc.beneficiary_count || 0), 0)
+  const totalDisbursed = schemes.reduce((s, sc) => s + (sc.total_disbursed || 0), 0)
 
   return (
     <div className="p-8 pb-20 font-sans">
@@ -107,7 +109,7 @@ export default function RulesEngine() {
                   </div>
                   <h3 className="text-base font-bold text-text-primary">{scheme.name}</h3>
                   <p className="text-xs text-text-secondary font-data mt-0.5">
-                    {scheme.payout_frequency} · ₹{scheme.amount.toLocaleString('en-IN')} {t('rulesEngine.payout')} · {scheme.beneficiary_count.toLocaleString('en-IN')} {t('common.active')}
+                    {scheme.payout_frequency || '—'} · ₹{(scheme.amount || 0).toLocaleString('en-IN')} {t('rulesEngine.payout')} · {(scheme.beneficiary_count || 0).toLocaleString('en-IN')} {t('common.active')}
                   </p>
                 </div>
 
@@ -118,7 +120,7 @@ export default function RulesEngine() {
                     </span>
                   )}
                   <div className="text-right">
-                    <p className="text-base font-bold font-mono text-text-primary">₹{(scheme.total_disbursed / 10000000).toFixed(2)}Cr</p>
+                    <p className="text-base font-bold font-mono text-text-primary">₹{((scheme.total_disbursed || 0) / 10000000).toFixed(2)}Cr</p>
                     <p className="text-xs text-text-secondary font-data">{t('rulesEngine.totalDisbursed')}</p>
                   </div>
                   {isExpanded ? <ChevronUp size={18} className="text-text-secondary" /> : <ChevronDown size={18} className="text-text-secondary/70" />}
@@ -146,7 +148,7 @@ export default function RulesEngine() {
                       {/* Mutual exclusions */}
                       <div>
                         <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">{t('rulesEngine.mutualExclusions')}</p>
-                        {scheme.mutual_exclusions.length === 0 ? (
+                        {(!Array.isArray(scheme.mutual_exclusions) || scheme.mutual_exclusions.length === 0) ? (
                           <p className="text-sm text-text-secondary font-data italic">None</p>
                         ) : (
                           <div className="flex flex-wrap gap-2">
@@ -163,7 +165,7 @@ export default function RulesEngine() {
                         <div className="space-y-2 font-data text-sm">
                           <div className="flex justify-between">
                             <span className="text-text-secondary">{t('rulesEngine.payout')}</span>
-                            <span className="font-bold font-mono text-xs">₹{scheme.amount.toLocaleString()}</span>
+                            <span className="font-bold font-mono text-xs">₹{(scheme.amount || 0).toLocaleString()}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-text-secondary">{t('rulesEngine.frequency')}</span>
@@ -171,7 +173,7 @@ export default function RulesEngine() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-text-secondary">{t('common.beneficiaries')}</span>
-                            <span className="font-bold text-xs">{scheme.beneficiary_count.toLocaleString()}</span>
+                            <span className="font-bold text-xs">{(scheme.beneficiary_count || 0).toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
