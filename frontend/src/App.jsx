@@ -30,6 +30,7 @@ import AuditVerifierQueue from './pages/audit/AuditVerifierQueue'
 // Scheme Verifier
 import SchemeVerifierDashboard from './pages/verifier/SchemeVerifierDashboard'
 import SubmitEvidence from './pages/verifier/SubmitEvidence'
+import ClosedCases from './pages/verifier/ClosedCases'
 
 // ── Loading spinner shown while session is being restored ────────────────
 function LoadingScreen() {
@@ -132,6 +133,7 @@ export default function App() {
         {/* Scheme Verifier */}
         <Route path="/verifier/my-cases" element={<SchemeVerifierDashboard />} />
         <Route path="/verifier/submit-evidence" element={<SubmitEvidence />} />
+        <Route path="/verifier/closed" element={<ClosedCases />} />
 
         {/* General User */}
         <Route path="/user/dashboard" element={<UserDashboard />} />

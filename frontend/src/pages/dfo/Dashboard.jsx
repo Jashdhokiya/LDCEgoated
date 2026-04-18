@@ -141,7 +141,27 @@ export default function Dashboard() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} dataKey="value" stroke="none">
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={95}
+                    dataKey="value"
+                    stroke="none"
+                    label={({ name, value, cx, cy, midAngle, outerRadius }) => {
+                      const RADIAN = Math.PI / 180
+                      const radius = outerRadius + 18
+                      const x = cx + radius * Math.cos(-midAngle * RADIAN)
+                      const y = cy + radius * Math.sin(-midAngle * RADIAN)
+                      const LABELS = { DECEASED: 'Deceased', DUPLICATE: 'Duplicate', UNDRAWN: 'Undrawn', CROSS_SCHEME: 'Cross-Scheme' }
+                      return (
+                        <text x={x} y={y} fill="var(--color-text-secondary)" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px] font-data font-bold">
+                          {LABELS[name] || name} ({value})
+                        </text>
+                      )
+                    }}
+                  >
                     {pieData.map((entry) => (
                       <Cell key={entry.name} fill={COLORS[entry.name] || '#3B82F6'} />
                     ))}

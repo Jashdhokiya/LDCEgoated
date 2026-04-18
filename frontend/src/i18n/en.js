@@ -53,6 +53,7 @@ const en = {
     generateReport: 'Generate Report',
     verifierReports: 'Verifier Reports',
     myOpenCases: 'My Open Cases',
+    closedCases: 'Closed Cases',
     myDashboard: 'My Dashboard',
   },
 
@@ -347,9 +348,15 @@ const en = {
   verifier: {
     title: 'Field Verification Queue',
     subtitle: 'Your assigned cases — submit GPS-tagged photo evidence for each',
-    pendingEvidence: 'Pending Evidence Submission',
+    pending: 'Pending',
+    submitted: 'Submitted',
+    submitEvidenceBtn: 'Submit Evidence',
+    pendingSubmission: 'Pending Evidence Submission',
+    assigned: 'Assigned',
     noPending: 'No pending cases. All caught up!',
     submitEvidence: 'Submit Evidence',
+    closedCases: 'Closed Cases',
+    noClosed: 'No closed cases yet.',
   },
 
   // ── Submit Evidence ──

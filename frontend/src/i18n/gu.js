@@ -36,6 +36,7 @@ const gu = {
     generateReport: 'અહેવાલ બનાવો',
     verifierReports: 'ચકાસણી અહેવાલો',
     myOpenCases: 'મારા ખુલ્લા કેસ',
+    closedCases: 'બંધ કેસ',
     myDashboard: 'મારું ડેશબોર્ડ',
   },
   roles: {
@@ -353,9 +354,15 @@ const gu = {
   verifier: {
     title: 'ક્ષેત્ર ચકાસણી કતાર',
     subtitle: 'તમારા સોંપાયેલ કેસ — દરેક માટે GPS-ટેગ કરેલ ફોટો પુરાવા સબમિટ કરો',
-    pendingEvidence: 'બાકી પુરાવા સબમિશન',
+    pending: 'બાકી',
+    submitted: 'સબમિટ થયેલ',
+    submitEvidenceBtn: 'પુરાવા સબમિટ કરો',
+    pendingSubmission: 'બાકી પુરાવા સબમિશન',
+    assigned: 'સોંપાયેલ',
     noPending: 'કોઈ બાકી કેસ નથી. બધું પૂર્ણ!',
     submitEvidence: 'પુરાવા સબમિટ કરો',
+    closedCases: 'બંધ કેસ',
+    noClosed: 'હજી સુધી કોઈ બંધ કેસ નથી.',
   },
   submitEvidence: {
     title: 'ક્ષેત્ર પુરાવા સબમિટ કરો',
