@@ -31,8 +31,7 @@ def _get_db():
         from database import get_db
         return get_db()
     except Exception as e:
-        print(f"  [user] MongoDB unavailable: {e}")
-        return None
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}")
 
 
 def _col(name: str):
@@ -96,8 +95,8 @@ async def get_profile(user: dict = Depends(require_role("USER"))):
                     schemes = payments
                 doc["registered_schemes"] = schemes
                 return doc
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
 
     # Fallback — use hardcoded profile (correct user only)
     if uid == "USR-GJ-001":
@@ -117,8 +116,8 @@ async def get_user_schemes(user: dict = Depends(require_role("USER"))):
             docs = list(col.find({"beneficiary_id": uid}, {"_id": 0}))
             if docs:
                 return {"user_id": uid, "count": len(docs), "schemes": docs}
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
 
     # JSON file fallback
     payments = [p for p in _load_json("payment_ledger.json") if p.get("beneficiary_id") == uid]
@@ -137,8 +136,8 @@ async def get_user_payments(user: dict = Depends(require_role("USER"))):
         try:
             docs = list(col.find({"beneficiary_id": uid}, {"_id": 0}).sort("payment_date", -1))
             return {"user_id": uid, "count": len(docs), "payments": docs}
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
 
     payments = [p for p in _load_json("payment_ledger.json") if p.get("beneficiary_id") == uid]
     return {"user_id": uid, "count": len(payments), "payments": payments}

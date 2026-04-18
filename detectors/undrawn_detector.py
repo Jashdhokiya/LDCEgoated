@@ -1,13 +1,13 @@
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, List
 
 from .data_loader import load_all
 
 THRESHOLD_DAYS = 60
-TODAY = date(2025, 4, 18)
 
 
 def detect_undrawn() -> List[Dict[str, Any]]:
+    today = datetime.now().date()
     data = load_all()
     flags: List[Dict[str, Any]] = []
 
@@ -22,7 +22,7 @@ def detect_undrawn() -> List[Dict[str, Any]]:
         except (KeyError, TypeError, ValueError):
             continue
 
-        days_pending = (TODAY - payment_date).days
+        days_pending = (today - payment_date).days
         if days_pending < THRESHOLD_DAYS:
             continue
 

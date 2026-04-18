@@ -10,7 +10,6 @@ from .data_loader import load_all
 NORMALIZER_URL = os.getenv("NORMALIZER_URL", "http://localhost:8000/api/normalize-names")
 REQUEST_TIMEOUT_SECONDS = 1.5
 FUZZY_DISTANCE_THRESHOLD = 1
-MAX_FUZZY_FLAGS = 100
 
 
 def levenshtein(s1: str, s2: str) -> int:
@@ -172,8 +171,6 @@ def detect_duplicates() -> List[Dict[str, Any]]:
         if norm:
             by_norm[norm].append(ben)
 
-    fuzzy_flag_count = 0
-
     # Exact normalized name match across different districts
     for norm, group in by_norm.items():
         if len(group) <= 1:
@@ -219,86 +216,71 @@ def detect_duplicates() -> List[Dict[str, Any]]:
                     },
                 }
             )
-            fuzzy_flag_count += 1
-            if fuzzy_flag_count >= MAX_FUZZY_FLAGS:
-                break
-        if fuzzy_flag_count >= MAX_FUZZY_FLAGS:
-            break
 
     # Near-match (edit distance = 1) across different districts — capped
-    if fuzzy_flag_count < MAX_FUZZY_FLAGS:
-        norm_keys = list(by_norm.keys())
-        # Bucket by (first_char, length) for efficient near-match search
-        buckets: Dict[tuple, List[str]] = defaultdict(list)
-        for nk in norm_keys:
-            if nk:
-                buckets[(nk[0], len(nk))].append(nk)
+    norm_keys = list(by_norm.keys())
+    # Bucket by (first_char, length) for efficient near-match search
+    buckets: Dict[tuple, List[str]] = defaultdict(list)
+    for nk in norm_keys:
+        if nk:
+            buckets[(nk[0], len(nk))].append(nk)
 
-        for (first_char, base_len), norms_in_bucket in buckets.items():
-            if fuzzy_flag_count >= MAX_FUZZY_FLAGS:
-                break
-            candidate_norms = []
-            for ckey in [(first_char, base_len - 1), (first_char, base_len), (first_char, base_len + 1)]:
-                candidate_norms.extend(buckets.get(ckey, []))
+    for (first_char, base_len), norms_in_bucket in buckets.items():
+        candidate_norms = []
+        for ckey in [(first_char, base_len - 1), (first_char, base_len), (first_char, base_len + 1)]:
+            candidate_norms.extend(buckets.get(ckey, []))
 
-            for i, n1 in enumerate(norms_in_bucket):
-                if fuzzy_flag_count >= MAX_FUZZY_FLAGS:
-                    break
-                for n2 in candidate_norms:
-                    if n1 >= n2:  # avoid duplicate comparisons
-                        continue
-                    if abs(len(n1) - len(n2)) > FUZZY_DISTANCE_THRESHOLD:
-                        continue
-                    distance = levenshtein(n1, n2)
-                    if distance > FUZZY_DISTANCE_THRESHOLD:
-                        continue
+        for i, n1 in enumerate(norms_in_bucket):
+            for n2 in candidate_norms:
+                if n1 >= n2:  # avoid duplicate comparisons
+                    continue
+                if abs(len(n1) - len(n2)) > FUZZY_DISTANCE_THRESHOLD:
+                    continue
+                distance = levenshtein(n1, n2)
+                if distance > FUZZY_DISTANCE_THRESHOLD:
+                    continue
 
-                    # Get cross-district pairs from these two normalized names
-                    for b1 in by_norm[n1]:
-                        if fuzzy_flag_count >= MAX_FUZZY_FLAGS:
-                            break
-                        for b2 in by_norm[n2]:
-                            if b1.get("district") == b2.get("district"):
-                                continue
-                            pair_key = tuple(
-                                sorted([b1.get("beneficiary_id", ""), b2.get("beneficiary_id", "")])
-                            )
-                            if pair_key in seen_pairs:
-                                continue
-                            if b1.get("aadhaar_hash") and b1.get("aadhaar_hash") == b2.get("aadhaar_hash"):
-                                continue
-                            seen_pairs.add(pair_key)
+                # Get cross-district pairs from these two normalized names
+                for b1 in by_norm[n1]:
+                    for b2 in by_norm[n2]:
+                        if b1.get("district") == b2.get("district"):
+                            continue
+                        pair_key = tuple(
+                            sorted([b1.get("beneficiary_id", ""), b2.get("beneficiary_id", "")])
+                        )
+                        if pair_key in seen_pairs:
+                            continue
+                        if b1.get("aadhaar_hash") and b1.get("aadhaar_hash") == b2.get("aadhaar_hash"):
+                            continue
+                        seen_pairs.add(pair_key)
 
-                            dup = b2
-                            primary = b1
-                            dup_payments = data["payments_by_id"].get(dup.get("beneficiary_id"), [])
-                            total_at_risk = sum((p.get("amount", 0) or 0) for p in dup_payments)
+                        dup = b2
+                        primary = b1
+                        dup_payments = data["payments_by_id"].get(dup.get("beneficiary_id"), [])
+                        total_at_risk = sum((p.get("amount", 0) or 0) for p in dup_payments)
 
-                            flags.append(
-                                {
-                                    "beneficiary_id": dup.get("beneficiary_id"),
-                                    "beneficiary_name": dup.get("name", "Unknown"),
-                                    "district": dup.get("district", "Unknown"),
-                                    "scheme": dup_payments[0].get("scheme", "MULTI") if dup_payments else "MULTI",
-                                    "payment_id": dup_payments[0].get("payment_id") if dup_payments else None,
-                                    "payment_amount": total_at_risk,
-                                    "payment_date": dup_payments[0].get("payment_date") if dup_payments else None,
-                                    "leakage_type": "DUPLICATE",
-                                    "evidence_data": {
-                                        "match_method": "FUZZY_NAME",
-                                        "primary_name": primary.get("name"),
-                                        "primary_district": primary.get("district"),
-                                        "duplicate_name": dup.get("name"),
-                                        "duplicate_district": dup.get("district"),
-                                        "normalized_primary": n1,
-                                        "normalized_duplicate": n2,
-                                        "distance": distance,
-                                        "total_at_risk": total_at_risk,
-                                    },
-                                }
-                            )
-                            fuzzy_flag_count += 1
-                            if fuzzy_flag_count >= MAX_FUZZY_FLAGS:
-                                break
+                        flags.append(
+                            {
+                                "beneficiary_id": dup.get("beneficiary_id"),
+                                "beneficiary_name": dup.get("name", "Unknown"),
+                                "district": dup.get("district", "Unknown"),
+                                "scheme": dup_payments[0].get("scheme", "MULTI") if dup_payments else "MULTI",
+                                "payment_id": dup_payments[0].get("payment_id") if dup_payments else None,
+                                "payment_amount": total_at_risk,
+                                "payment_date": dup_payments[0].get("payment_date") if dup_payments else None,
+                                "leakage_type": "DUPLICATE",
+                                "evidence_data": {
+                                    "match_method": "FUZZY_NAME",
+                                    "primary_name": primary.get("name"),
+                                    "primary_district": primary.get("district"),
+                                    "duplicate_name": dup.get("name"),
+                                    "duplicate_district": dup.get("district"),
+                                    "normalized_primary": n1,
+                                    "normalized_duplicate": n2,
+                                    "distance": distance,
+                                    "total_at_risk": total_at_risk,
+                                },
+                            }
+                        )
 
     return flags

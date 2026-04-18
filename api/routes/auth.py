@@ -36,13 +36,13 @@ def _get_db():
     try:
         from ...database import get_db
         return get_db()
-    except Exception:
-        pass
+    except Exception as exc:
+        rel_error = exc
     try:
         from database import get_db
         return get_db()
-    except Exception:
-        return None
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database unavailable: {rel_error}") from exc
 
 
 def _lookup_officer(email: str, password: str):
@@ -65,8 +65,11 @@ def _lookup_officer(email: str, password: str):
                 return officer
         except HTTPException:
             raise
-        except Exception:
-            pass  # MongoDB error → fall through to demo fallback
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Database unavailable: {exc}",
+            )
 
     # ── Fallback: demo accounts ───────────────────────────────────────────────
     demo = get_officer_by_email_fallback(email)

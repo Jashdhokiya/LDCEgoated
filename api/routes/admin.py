@@ -35,8 +35,7 @@ def _get_db():
         from database import get_db
         return get_db()
     except Exception as e:
-        print(f"  [admin] MongoDB unavailable: {e}")
-        return None
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}")
 
 
 def _col(name: str):
@@ -85,8 +84,8 @@ async def state_overview(user: dict = Depends(require_role("STATE_ADMIN"))):
     if flags_col is not None:
         try:
             flags = list(flags_col.find({}, {"_id": 0}))
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
 
     # Try MongoDB first for counts
     ben_col = _col("beneficiaries")
@@ -96,13 +95,13 @@ async def state_overview(user: dict = Depends(require_role("STATE_ADMIN"))):
     if ben_col is not None:
         try:
             total_ben = ben_col.count_documents({})
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
     if pay_col is not None:
         try:
             total_pay = pay_col.count_documents({})
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
     if total_ben == 0:
         total_ben = len(_load_json("beneficiaries.json"))
     if total_pay == 0:
@@ -144,8 +143,8 @@ async def district_stats(user: dict = Depends(require_role("STATE_ADMIN"))):
                     if key:
                         agg[d][key] += 1
                 return sorted(agg.values(), key=lambda x: x["total_flags"], reverse=True)
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
     return FALLBACK_DISTRICT_STATS
 
 
@@ -157,8 +156,8 @@ async def get_schemes(user: dict = Depends(require_role("STATE_ADMIN"))):
             docs = list(col.find({}, {"_id": 0}))
             if docs:
                 return docs
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
     raw = _load_json("scheme_rules.json")
     if isinstance(raw, dict):
         return [{"scheme_id": k, **v} for k, v in raw.items()] or FALLBACK_SCHEMES
@@ -184,8 +183,8 @@ async def update_scheme(
         try:
             col.update_one({"scheme_id": scheme_id}, {"$set": update}, upsert=True)
             return col.find_one({"scheme_id": scheme_id}, {"_id": 0})
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
 
     base = next((s for s in FALLBACK_SCHEMES if s["scheme_id"] == scheme_id), None)
     if not base:
@@ -202,6 +201,6 @@ async def list_officers(user: dict = Depends(require_role("STATE_ADMIN"))):
             docs = list(col.find({}, {"_id": 0, "password_hash": 0}))
             if docs:
                 return docs
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
     return [{k: v for k, v in o.items() if k != "plain_password"} for o in DEMO_OFFICERS]

@@ -74,6 +74,9 @@ def _try_load_from_mongo() -> bool:
                 "bank_account_hash": s.get("bank_account_hash"),
                 "is_deceased": s.get("is_deceased", False),
                 "death_date": s.get("death_date"),
+                "schemes_taken": s.get("schemes_taken", []),
+                "schemes_eligible": s.get("schemes_eligible", []),
+                "eligible_but_not_taken": s.get("eligible_but_not_taken", []),
             }
             beneficiaries.append(ben)
 

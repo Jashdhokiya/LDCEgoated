@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
 
 from ..deps import require_role, get_current_user
+from models import CaseStatus
 
 router = APIRouter(tags=["analysis"])
 
@@ -41,8 +42,7 @@ def _get_db():
         from database import get_db
         return get_db()
     except Exception as e:
-        print(f"  [analysis] MongoDB unavailable: {e}")
-        return None
+        raise HTTPException(503, f"Database unavailable: {e}")
 
 
 def _col(name: str):
@@ -113,7 +113,7 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
     col = _col("flags")
     if col is not None:
         try:
-            col.delete_many({})
+            col.delete_many({"status": {"$in": [CaseStatus.OPEN.value, None]}})
             if enriched:
                 col.insert_many([{k: v for k, v in f.items() if k != "_id"} for f in enriched])
         except Exception as e:
@@ -139,8 +139,8 @@ async def get_flags(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUD
             docs = list(col.find({}, {"_id": 0}).sort("risk_score", -1))
             if docs:
                 return docs
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     return sorted(_flag_store.values(), key=lambda x: x.get("risk_score", 0), reverse=True)
 
 
@@ -152,8 +152,8 @@ async def get_flag(flag_id: str, user: dict = Depends(require_role("DFO", "STATE
             doc = col.find_one({"flag_id": flag_id}, {"_id": 0})
             if doc:
                 return doc
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     if flag_id not in _flag_store:
         raise HTTPException(404, "Flag not found")
     return _flag_store[flag_id]
@@ -162,7 +162,7 @@ async def get_flag(flag_id: str, user: dict = Depends(require_role("DFO", "STATE
 @router.patch("/api/flag/{flag_id}/status")
 async def update_flag_status(flag_id: str, body: dict,
                               user: dict = Depends(require_role("DFO", "AUDIT"))):
-    valid = {"OPEN", "ASSIGNED", "RESOLVED"}
+    valid = {status.value for status in CaseStatus}
     new_status = body.get("status")
     if new_status not in valid:
         raise HTTPException(400, f"Status must be one of {valid}")
@@ -171,8 +171,8 @@ async def update_flag_status(flag_id: str, body: dict,
     if col is not None:
         try:
             col.update_one({"flag_id": flag_id}, {"$set": {"status": new_status}})
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
 
     if flag_id in _flag_store:
         _flag_store[flag_id]["status"] = new_status
@@ -187,8 +187,8 @@ async def get_stats(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUD
     if col is not None:
         try:
             flags = list(col.find({}, {"_id": 0}))
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     if not flags:
         flags = list(_flag_store.values())
 
@@ -220,8 +220,8 @@ async def get_report(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AU
     if col is not None:
         try:
             flags = list(col.find({}, {"_id": 0}))
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     if not flags:
         flags = list(_flag_store.values())
 

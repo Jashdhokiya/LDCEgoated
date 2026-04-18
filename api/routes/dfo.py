@@ -13,13 +13,16 @@ GET  /api/dfo/student/{id}     — single beneficiary detail
 """
 import json
 import os
+import uuid
 from collections import defaultdict
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from ..deps import require_role
 from ..seed import DEMO_OFFICERS
+from models import CaseStatus, InvestigationModel
 
 router = APIRouter(prefix="/api/dfo", tags=["dfo"])
 
@@ -40,13 +43,81 @@ def _get_db():
         from database import get_db
         return get_db()
     except Exception as e:
-        print(f"  [dfo] MongoDB unavailable: {e}")
-        return None
+        raise HTTPException(503, f"Database unavailable: {e}")
 
 
 def _col(name: str):
     db = _get_db()
     return db[name] if db is not None else None
+
+
+def _get_open_flag(flag_id: str):
+    col = _col("flags")
+    if col is None:
+        return None
+    try:
+        return col.find_one({"flag_id": flag_id, "status": CaseStatus.OPEN.value}, {"_id": 0})
+    except Exception:
+        return None
+
+
+def _get_investigation(case_id: str):
+    col = _col("investigations")
+    if col is None:
+        return None
+    try:
+        return col.find_one(
+            {"$or": [{"case_id": case_id}, {"investigation_id": case_id}, {"flag_id": case_id}]},
+            {"_id": 0},
+        )
+    except Exception:
+        return None
+
+
+class InvestigationCreateRequest(BaseModel):
+    flag_id: str
+    verifier_id: Optional[str] = None
+
+
+def _promote_flag_to_investigation(flag_id: str, verifier_id: Optional[str], assigned_by: str):
+    flag_doc = _get_open_flag(flag_id)
+    if not flag_doc:
+        raise HTTPException(404, "Open flag not found")
+
+    investigation_id = f"INV-{uuid.uuid4().hex[:10].upper()}"
+    now = __import__("datetime").datetime.utcnow().isoformat()
+    investigation = InvestigationModel(
+        investigation_id=investigation_id,
+        flag_id=flag_doc["flag_id"],
+        beneficiary_id=flag_doc.get("beneficiary_id"),
+        status=CaseStatus.ASSIGNED_TO_VERIFIER if verifier_id else CaseStatus.OPEN,
+        assigned_verifier_id=verifier_id,
+        created_at=__import__("datetime").datetime.utcnow(),
+        updated_at=__import__("datetime").datetime.utcnow(),
+    ).model_dump()
+    investigation["case_id"] = investigation_id
+    investigation.update({k: v for k, v in flag_doc.items() if k not in {"_id"}})
+    investigation["flag_id"] = flag_doc["flag_id"]
+    investigation["status"] = (CaseStatus.ASSIGNED_TO_VERIFIER.value if verifier_id else CaseStatus.OPEN.value)
+    investigation["assigned_verifier_id"] = verifier_id
+    investigation["assigned_by"] = assigned_by
+    investigation["assigned_at"] = now if verifier_id else None
+
+    inv_col = _col("investigations")
+    flag_col = _col("flags")
+    if inv_col is None or flag_col is None:
+        raise HTTPException(503, "Database unavailable")
+
+    try:
+        inv_col.insert_one(investigation)
+        flag_col.update_one(
+            {"flag_id": flag_id},
+            {"$set": {"status": investigation["status"], "promoted_to_investigation": True, "investigation_id": investigation_id}},
+        )
+    except Exception as exc:
+        raise HTTPException(503, f"Database unavailable: {exc}")
+
+    return investigation
 
 
 # ── Fallback data ─────────────────────────────────────────────────────────────
@@ -69,8 +140,8 @@ async def dfo_dashboard(user: dict = Depends(require_role("DFO"))):
     if flags_col is not None:
         try:
             flags = list(flags_col.find({}, {"_id": 0}))
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
 
     # Try MongoDB first for beneficiary / payment counts
     ben_col = _col("beneficiaries")
@@ -80,13 +151,13 @@ async def dfo_dashboard(user: dict = Depends(require_role("DFO"))):
     if ben_col is not None:
         try:
             total_ben = ben_col.count_documents({})
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     if pay_col is not None:
         try:
             total_pay = pay_col.count_documents({})
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     # Fallback to JSON if MongoDB returned 0
     if total_ben == 0:
         total_ben = len(_load_json("beneficiaries.json"))
@@ -122,11 +193,6 @@ async def list_investigations(
     limit: int = 50,
     user: dict = Depends(require_role("DFO", "SCHEME_VERIFIER", "AUDIT")),
 ):
-    col = _col("investigations")
-    if col is None:
-        # Fall back to flags collection
-        col = _col("flags")
-
     query: dict = {}
     if status:
         query["status"] = status
@@ -135,32 +201,72 @@ async def list_investigations(
     if leakage_type:
         query["leakage_type"] = leakage_type
 
-    if col is not None:
-        try:
-            docs = list(col.find(query, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
-            if docs:
-                return {"total": col.count_documents(query), "cases": docs}
-        except Exception:
-            pass
+    cases: list = []
+    total = 0
 
-    return {"total": 0, "cases": []}
+    if status and status != CaseStatus.OPEN.value:
+        col = _col("investigations")
+        if col is None:
+            raise HTTPException(503, "Database unavailable")
+        try:
+            total = col.count_documents(query)
+            cases = list(col.find(query, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
+        return {"total": total, "cases": cases}
+
+    flag_col = _col("flags")
+    inv_col = _col("investigations")
+    if flag_col is None and inv_col is None:
+        raise HTTPException(503, "Database unavailable")
+
+    try:
+        if flag_col is not None:
+            flag_query = dict(query)
+            flag_query["$or"] = [
+                {"status": {"$exists": False}},
+                {"status": CaseStatus.OPEN.value},
+            ]
+            flags = list(flag_col.find(flag_query, {"_id": 0}).sort("risk_score", -1))
+            cases.extend(flags)
+            total += flag_col.count_documents(flag_query)
+
+        if inv_col is not None:
+            inv_query = dict(query)
+            inv_query["status"] = {"$ne": CaseStatus.OPEN.value}
+            investigations = list(inv_col.find(inv_query, {"_id": 0}).sort("risk_score", -1))
+            cases.extend(investigations)
+            total += inv_col.count_documents(inv_query)
+    except Exception as exc:
+        raise HTTPException(503, f"Database unavailable: {exc}")
+
+    cases = sorted(cases, key=lambda item: item.get("risk_score", 0), reverse=True)
+    return {"total": total, "cases": cases[skip:skip + limit]}
 
 
 @router.get("/investigations/{case_id}")
 async def get_investigation(case_id: str, user: dict = Depends(require_role("DFO"))):
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                doc = col.find_one(
-                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
-                    {"_id": 0}
-                )
-                if doc:
-                    return doc
-            except Exception:
-                pass
+    doc = _get_investigation(case_id)
+    if doc:
+        return doc
+
+    flag_col = _col("flags")
+    if flag_col is not None:
+        try:
+            doc = flag_col.find_one({"flag_id": case_id}, {"_id": 0})
+            if doc:
+                return doc
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     raise HTTPException(404, "Case not found")
+
+
+@router.post("/investigations")
+async def create_investigation(
+    body: InvestigationCreateRequest,
+    user: dict = Depends(require_role("DFO")),
+):
+    return _promote_flag_to_investigation(body.flag_id, body.verifier_id, user["sub"])
 
 
 @router.patch("/investigations/{case_id}/assign")
@@ -173,22 +279,26 @@ async def assign_investigation(
     if not verifier_id:
         raise HTTPException(400, "verifier_id is required")
 
+    investigation = _get_investigation(case_id)
+    if not investigation:
+        investigation = _promote_flag_to_investigation(case_id, verifier_id, user["sub"])
+        return investigation
+
     update = {
-        "status":              "ASSIGNED_TO_VERIFIER",
+        "status": CaseStatus.ASSIGNED_TO_VERIFIER.value,
         "assigned_verifier_id": verifier_id,
-        "assigned_by":         user["sub"],
-        "assigned_at":         str(__import__("datetime").datetime.utcnow().isoformat()),
+        "assigned_by": user["sub"],
+        "assigned_at": __import__("datetime").datetime.utcnow().isoformat(),
     }
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                col.update_one(
-                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
-                    {"$set": update}
-                )
-            except Exception:
-                pass
+    inv_col = _col("investigations")
+    flag_col = _col("flags")
+    if inv_col is None or flag_col is None:
+        raise HTTPException(503, "Database unavailable")
+    try:
+        inv_col.update_one({"$or": [{"case_id": case_id}, {"investigation_id": case_id}, {"flag_id": case_id}]}, {"$set": update})
+        flag_col.update_one({"flag_id": investigation.get("flag_id", case_id)}, {"$set": update})
+    except Exception as exc:
+        raise HTTPException(503, f"Database unavailable: {exc}")
     return {"case_id": case_id, **update}
 
 
@@ -204,8 +314,8 @@ async def get_institutions(
             docs = list(col.find(query, {"_id": 0}))
             if docs:
                 return docs
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
 
     data = FALLBACK_INSTITUTIONS
     if flagged_only:
@@ -221,8 +331,8 @@ async def get_verifiers(user: dict = Depends(require_role("DFO"))):
             docs = list(col.find({"role": "SCHEME_VERIFIER", "is_active": True}, {"_id": 0, "password_hash": 0}))
             if docs:
                 return docs
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     return [
         {k: v for k, v in o.items() if k != "plain_password"}
         for o in DEMO_OFFICERS
@@ -244,8 +354,8 @@ async def get_students(
             docs = list(col.find(query, {"_id": 0}).skip(skip).limit(limit))
             total = col.count_documents(query)
             return {"total": total, "students": docs}
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     raw = _load_json("beneficiaries.json")
     if district:
         raw = [b for b in raw if b.get("district") == district]
@@ -260,8 +370,8 @@ async def get_student(beneficiary_id: str, user: dict = Depends(require_role("DF
             doc = col.find_one({"beneficiary_id": beneficiary_id}, {"_id": 0})
             if doc:
                 return doc
-        except Exception:
-            pass
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     for item in _load_json("beneficiaries.json"):
         if item.get("beneficiary_id") == beneficiary_id:
             return item

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..deps import require_role
+from models import CaseStatus
 
 router = APIRouter(prefix="/api/verifier", tags=["verifier"])
 
@@ -21,13 +22,28 @@ def _get_db():
         from database import get_db
         return get_db()
     except Exception as e:
-        print(f"  [verifier] MongoDB unavailable: {e}")
-        return None
+        raise HTTPException(503, f"Database unavailable: {e}")
 
 
 def _col(name: str):
     db = _get_db()
     return db[name] if db is not None else None
+
+
+def _find_investigation(case_id: str, verifier_id: str):
+    col = _col("investigations")
+    if col is None:
+        return None
+    try:
+        return col.find_one(
+            {"$and": [
+                {"$or": [{"case_id": case_id}, {"investigation_id": case_id}, {"flag_id": case_id}]},
+                {"assigned_verifier_id": verifier_id},
+            ]},
+            {"_id": 0},
+        )
+    except Exception as exc:
+        raise HTTPException(503, f"Database unavailable: {exc}")
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -44,20 +60,25 @@ class EvidenceSubmission(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _find_case(case_id: str, verifier_id: str):
-    """Finds a case in mongo (investigations or flags) assigned to this verifier."""
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                doc = col.find_one(
-                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}],
-                     "assigned_verifier_id": verifier_id},
-                    {"_id": 0}
-                )
-                if doc:
-                    return doc, cname
-            except Exception:
-                pass
+    """Finds a promoted case assigned to this verifier."""
+    doc = _find_investigation(case_id, verifier_id)
+    if doc:
+        return doc, "investigations"
+
+    col = _col("flags")
+    if col is not None:
+        try:
+            doc = col.find_one(
+                {"$and": [
+                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
+                    {"assigned_verifier_id": verifier_id},
+                ]},
+                {"_id": 0},
+            )
+            if doc:
+                return doc, "flags"
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
     return None, None
 
 
@@ -69,17 +90,13 @@ async def my_cases(user: dict = Depends(require_role("SCHEME_VERIFIER"))):
     verifier_id = user["sub"]
     all_cases: list = []
 
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                docs = list(col.find(
-                    {"assigned_verifier_id": verifier_id},
-                    {"_id": 0}
-                ).sort("risk_score", -1))
-                all_cases.extend(docs)
-            except Exception:
-                pass
+    inv_col = _col("investigations")
+    if inv_col is not None:
+        try:
+            docs = list(inv_col.find({"assigned_verifier_id": verifier_id}, {"_id": 0}).sort("risk_score", -1))
+            all_cases.extend(docs)
+        except Exception as exc:
+            raise HTTPException(503, f"Database unavailable: {exc}")
 
     # De-duplicate by case_id / flag_id
     seen: set = set()
@@ -138,19 +155,25 @@ async def submit_evidence(
     }
 
     update = {
-        "status":       "VERIFICATION_SUBMITTED",
+        "status":       CaseStatus.VERIFICATION_SUBMITTED.value,
         "field_report": field_report,
     }
 
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                col.update_one(
-                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
-                    {"$set": update}
-                )
-            except Exception:
-                pass
+    inv_col = _col("investigations")
+    flag_col = _col("flags")
+    if inv_col is None or flag_col is None:
+        raise HTTPException(503, "Database unavailable")
+    try:
+        inv_col.update_one(
+            {"$or": [{"case_id": case_id}, {"investigation_id": case_id}, {"flag_id": case_id}]},
+            {"$set": update}
+        )
+        if doc and doc.get("flag_id"):
+            flag_col.update_one(
+                {"flag_id": doc["flag_id"]},
+                {"$set": update}
+            )
+    except Exception as exc:
+        raise HTTPException(503, f"Database unavailable: {exc}")
 
     return {"case_id": case_id, "status": "VERIFICATION_SUBMITTED", "field_report": field_report}

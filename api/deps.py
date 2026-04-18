@@ -20,13 +20,39 @@ def get_current_user(
     """
     try:
         payload = decode_token(credentials.credentials)
-        return payload
     except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Token invalid or expired: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    try:
+        from database import get_officers_collection
+
+        col = get_officers_collection()
+        if col is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable")
+
+        officer = col.find_one({"officer_id": payload.get("sub")}, {"_id": 0, "password_hash": 0})
+        if not officer:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account not found or revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        if not officer.get("is_active", False):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account is disabled",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database unavailable: {exc}")
+
+    return payload
 
 
 def require_role(*allowed_roles: str):
