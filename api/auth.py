@@ -1,29 +1,39 @@
 """
 api/auth.py
 JWT token creation / verification and password hashing helpers.
+
+NOTE: We use native `bcrypt` instead of passlib.CryptContext because
+passlib's bcrypt backend crashes with bcrypt>=4.0 ("error reading bcrypt
+version" / AttributeError: module 'bcrypt' has no attribute '__about__').
 """
 import os
 from datetime import datetime, timedelta
 from typing import Optional
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 
 SECRET_KEY  = os.getenv("JWT_SECRET", "eduguard-secret-key-CHANGE-in-prod-2026")
 ALGORITHM   = "HS256"
 TOKEN_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "8"))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 # ── Password helpers ────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    # bcrypt max input is 72 bytes
+    if len(plain) > 72:
+        plain = plain[:72]
+    return bcrypt.hashpw(plain.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    if len(plain) > 72:
+        plain = plain[:72]
+    try:
+        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
 
 
 # ── Token helpers ────────────────────────────────────────────────────────────
