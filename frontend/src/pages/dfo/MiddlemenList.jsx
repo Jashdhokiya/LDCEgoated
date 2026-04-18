@@ -100,7 +100,7 @@ export default function MiddlemenList() {
           <Building2 size={40} className="text-text-secondary mb-3" />
           <p className="text-sm font-bold text-text-primary font-sans mb-1">{t('middlemen.noInstitutions')}</p>
           <p className="text-xs text-text-secondary font-data mb-4">{t('middlemen.noInstSub')}</p>
-          <button onClick={fetchInstitutions} className="px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-all">
+          <button onClick={fetchInstitutions} className="px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:brightness-110 transition-all">
             {t('common.retry')}
           </button>
         </div>

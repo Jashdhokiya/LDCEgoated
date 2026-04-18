@@ -94,6 +94,7 @@ async def list_investigations(
     user: dict = Depends(require_role("DFO", "SCHEME_VERIFIER", "AUDIT")),
 ):
     district = user.get("district")
+    taluka = user.get("taluka")
     # Try dedicated investigations collection first
     col = _col("investigations")
     if col is not None:
@@ -102,6 +103,8 @@ async def list_investigations(
             query["status"] = status
         if district:
             query["district"] = district
+        if taluka and user.get("role") == "AUDIT":
+            query["taluka"] = taluka
         if leakage_type:
             query["leakage_type"] = leakage_type
         try:
@@ -120,6 +123,8 @@ async def list_investigations(
             fquery["status"] = status
         if district:
             fquery["district"] = district
+        if taluka and user.get("role") == "AUDIT":
+            fquery["taluka"] = taluka
         if leakage_type:
             fquery["leakage_type"] = leakage_type
         try:
@@ -137,6 +142,8 @@ async def list_investigations(
                 all_flags = [f for f in all_flags if f.get("status") == status]
             if district:
                 all_flags = [f for f in all_flags if f.get("district") == district]
+            if taluka and user.get("role") == "AUDIT":
+                all_flags = [f for f in all_flags if f.get("taluka") == taluka]
             if leakage_type:
                 all_flags = [f for f in all_flags if f.get("leakage_type") == leakage_type]
             flags = all_flags[skip:skip + limit]

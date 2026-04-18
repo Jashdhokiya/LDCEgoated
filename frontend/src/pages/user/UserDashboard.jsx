@@ -114,7 +114,7 @@ function KYCModal({ user, onClose, onComplete }) {
               <button onClick={onClose} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-low transition-all">
                 {t('common.cancel')}
               </button>
-              <button onClick={() => setStep(2)} className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:bg-blue-900 transition-all">
+              <button onClick={() => setStep(2)} className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all">
                 {t('userDashboard.confirmContinue')}
               </button>
             </div>

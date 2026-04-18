@@ -38,6 +38,7 @@ def detect_cross_scheme() -> List[Dict[str, Any]]:
                         "beneficiary_id": ben_id,
                         "beneficiary_name": ben.get("name", "Unknown"),
                         "district": ben.get("district", "Unknown"),
+                        "taluka": ben.get("taluka", "Unknown"),
                         "scheme": f"{scheme_a}+{scheme_b}",
                         "payment_id": payment_a.get("payment_id"),
                         "payment_amount": total,

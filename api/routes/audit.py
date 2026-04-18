@@ -102,14 +102,23 @@ class AuditDecision(BaseModel):
 async def audit_pending(user: dict = Depends(require_role("AUDIT"))):
     """Cases awaiting audit review — VERIFICATION_SUBMITTED or high-risk OPEN flags."""
     results: list = []
+    
+    query_filter = {}
+    district = user.get("district")
+    taluka = user.get("taluka")
+    if district:
+        query_filter["district"] = district
+    if taluka:
+        query_filter["taluka"] = taluka
 
     # 1. Try investigations/flags collections for VERIFICATION_SUBMITTED
     for cname in ["investigations", "flags"]:
         col = _col(cname)
         if col is not None:
             try:
+                q = {"status": "VERIFICATION_SUBMITTED", **query_filter}
                 docs = list(col.find(
-                    {"status": "VERIFICATION_SUBMITTED"},
+                    q,
                     {"_id": 0}
                 ).sort("risk_score", -1))
                 results.extend(docs)
@@ -122,8 +131,9 @@ async def audit_pending(user: dict = Depends(require_role("AUDIT"))):
             col = _col(cname)
             if col is not None:
                 try:
+                    q = {"status": {"$in": ["OPEN", "ASSIGNED"]}, "risk_score": {"$gte": 50}, **query_filter}
                     docs = list(col.find(
-                        {"status": {"$in": ["OPEN", "ASSIGNED"]}, "risk_score": {"$gte": 50}},
+                        q,
                         {"_id": 0}
                     ).sort("risk_score", -1).limit(20))
                     results.extend(docs)
@@ -133,6 +143,12 @@ async def audit_pending(user: dict = Depends(require_role("AUDIT"))):
     # 3. Fall back to in-memory flag store
     if not results:
         mem_flags = _get_flags_from_memory()
+        
+        if district:
+            mem_flags = [f for f in mem_flags if f.get("district") == district]
+        if taluka:
+            mem_flags = [f for f in mem_flags if f.get("taluka") == taluka]
+            
         results = sorted(
             [f for f in mem_flags if f.get("status") in ("OPEN", "ASSIGNED") and f.get("risk_score", 0) >= 50],
             key=lambda x: x.get("risk_score", 0),
@@ -225,11 +241,21 @@ async def audit_decide(
 async def audit_all(user: dict = Depends(require_role("AUDIT"))):
     """All cases reviewed by any auditor (status == AUDIT_REVIEW)."""
     results: list = []
+    
+    query_filter = {}
+    district = user.get("district")
+    taluka = user.get("taluka")
+    if district:
+        query_filter["district"] = district
+    if taluka:
+        query_filter["taluka"] = taluka
+
     for cname in ["investigations", "flags"]:
         col = _col(cname)
         if col is not None:
             try:
-                docs = list(col.find({"status": "AUDIT_REVIEW"}, {"_id": 0}).sort("risk_score", -1))
+                q = {"status": "AUDIT_REVIEW", **query_filter}
+                docs = list(col.find(q, {"_id": 0}).sort("risk_score", -1))
                 results.extend(docs)
             except Exception:
                 pass
@@ -237,6 +263,10 @@ async def audit_all(user: dict = Depends(require_role("AUDIT"))):
     # Also check in-memory flag store
     if not results:
         mem_flags = _get_flags_from_memory()
+        if district:
+            mem_flags = [f for f in mem_flags if f.get("district") == district]
+        if taluka:
+            mem_flags = [f for f in mem_flags if f.get("taluka") == taluka]
         results = [f for f in mem_flags if f.get("status") == "AUDIT_REVIEW"]
 
     seen: set = set()

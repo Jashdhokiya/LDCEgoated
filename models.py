@@ -98,6 +98,7 @@ class FlagModel(BaseModel):
     beneficiary_id: str
     beneficiary_name: str
     district: str
+    taluka: Optional[str] = None
     scheme: str
     payment_id: Optional[str] = None
     payment_amount: Optional[int] = 0

@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+:root {
+  color-scheme: light;
+}
+
 @theme {
   --font-sans: "Public Sans", "Noto Sans Gujarati", sans-serif;
   --font-data: "Inter", sans-serif;
@@ -52,34 +56,43 @@
 
 /* ── Dark mode overrides ─────────────────────────────────────────────── */
 .dark {
-  --color-workspace: #0f172a;
-  --color-surface-lowest: #1e293b;
-  --color-surface-low: #1a2332;
-  --color-surface: #253347;
+  --color-workspace: #090d14;
+  --color-surface-lowest: #111722;
+  --color-surface-low: #181f2d;
+  --color-surface: #242d3d;
 
-  --color-text-primary: #e2e8f0;
-  --color-text-secondary: #94a3b8;
+  --color-text-primary: #f3f6fc;
+  --color-text-secondary: #bec8da;
 
-  --color-border-subtle: #334155;
+  --color-border-subtle: #3a455a;
 
-  --color-primary-override: #3b82f6;
+  --color-primary-override: #d6892e;
+  --color-secondary-override: #a5b0c3;
 
   /* Tinted backgrounds — dark versions */
-  --color-tint-blue: #172554;
-  --color-tint-red: #450a0a;
-  --color-tint-green: #052e16;
-  --color-tint-yellow: #422006;
-  --color-tint-orange: #431407;
-  --color-tint-violet: #2e1065;
-  --color-tint-emerald: #022c22;
+  --color-tint-blue: #1c273b;
+  --color-tint-red: #442329;
+  --color-tint-green: #17362f;
+  --color-tint-yellow: #44361e;
+  --color-tint-orange: #4a2d1b;
+  --color-tint-violet: #312a45;
+  --color-tint-emerald: #163a34;
 
-  --color-shell: #0b1120;
+  --color-shell: #06090f;
+  color-scheme: dark;
 }
 
 @layer base {
   body {
     @apply bg-shell text-text-primary font-sans antialiased;
     transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at 12% -8%, rgba(214, 137, 46, 0.14), transparent 34%),
+      radial-gradient(circle at 96% 2%, rgba(24, 31, 45, 0.56), transparent 36%);
+    background-attachment: fixed;
   }
 
   /* Dark mode overrides for form elements */
@@ -97,6 +110,11 @@
   .dark option {
     background-color: var(--color-surface-lowest);
     color: var(--color-text-primary);
+  }
+
+  .dark ::selection {
+    background-color: rgba(214, 137, 46, 0.38);
+    color: #ffffff;
   }
 }
 

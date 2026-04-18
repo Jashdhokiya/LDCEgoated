@@ -49,7 +49,7 @@ export default function LandingPage() {
           <ThemeToggle variant="navbar" />
           <button
             onClick={() => navigate('/login')}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary-override hover:bg-blue-900 text-white text-sm font-semibold rounded transition-colors"
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-override hover:brightness-110 text-white text-sm font-semibold rounded transition"
           >
             {t('landing.accessPortal')} <ArrowRight size={16} />
           </button>
@@ -68,18 +68,18 @@ export default function LandingPage() {
           <div className="flex items-center justify-center gap-4">
             <button
               onClick={() => navigate('/login')}
-              className="flex items-center gap-2 px-8 py-3.5 bg-primary-override hover:bg-blue-900 text-white font-semibold rounded transition-colors text-base shadow-sm hover:shadow-md"
+              className="flex items-center gap-2 px-8 py-3.5 bg-primary-override hover:brightness-110 text-white font-semibold rounded transition text-base shadow-sm hover:shadow-md"
             >
               {t('landing.loginToDashboard')} <ArrowRight size={18} />
             </button>
-            <a href="#features" className="px-8 py-3.5 border border-border-subtle hover:border-gray-400 text-text-secondary font-medium rounded transition-colors text-base bg-surface-lowest hover:bg-surface-low">
+            <a href="#features" className="px-8 py-3.5 border border-border-subtle hover:brightness-95 text-text-secondary font-medium rounded transition text-base bg-surface-lowest hover:bg-surface-low">
               {t('landing.learnMore')}
             </a>
           </div>
         </section>
 
         {/* Stats bar */}
-        <section className="bg-primary-override py-12 border-y border-blue-900">
+        <section className="bg-primary-override py-12 border-y border-border-subtle">
           <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 px-8 text-center">
             {[
               { value: '8,087', labelKey: 'landing.statBeneficiaries' },
@@ -89,7 +89,7 @@ export default function LandingPage() {
             ].map((s, i) => (
               <div key={i} className="flex flex-col items-center">
                 <p className="text-4xl font-bold text-white mb-2">{s.value}</p>
-                <p className="text-sm text-blue-200 font-medium tracking-wide uppercase">{t(s.labelKey)}</p>
+                <p className="text-sm text-white/80 font-medium tracking-wide uppercase">{t(s.labelKey)}</p>
               </div>
             ))}
           </div>
@@ -143,14 +143,14 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="bg-surface-lowest py-10 border-t border-border-subtle text-center px-6">
-        <Shield className="text-gray-300 mx-auto mb-4" size={32} />
+        <Shield className="text-text-secondary mx-auto mb-4" size={32} />
         <p className="text-sm text-text-secondary font-semibold mb-2 uppercase tracking-wider">
           {t('landing.footerGov')}
         </p>
         <p className="text-xs text-text-secondary mb-1">
           {t('landing.footerPlatform')}
         </p>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-text-secondary/80">
           {t('landing.footerWarning')}
         </p>
       </footer>

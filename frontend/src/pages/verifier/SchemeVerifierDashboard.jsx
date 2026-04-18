@@ -127,7 +127,7 @@ export default function SchemeVerifierDashboard() {
 
                   <button
                     onClick={() => navigate('/verifier/submit-evidence', { state: { caseData: c } })}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-colors shadow-sm whitespace-nowrap"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-primary-override text-white text-xs font-bold rounded-lg hover:brightness-110 transition-colors shadow-sm whitespace-nowrap"
                   >
                     <FileImage size={14} /> {t('verifier.submitEvidenceBtn')} <ChevronRight size={13} />
                   </button>

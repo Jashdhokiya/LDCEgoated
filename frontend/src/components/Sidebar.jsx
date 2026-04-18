@@ -42,11 +42,11 @@ const NAV_BY_ROLE = {
 }
 
 const ROLE_ACCENT = {
-  DFO:             'bg-blue-500',
+  DFO:             'bg-amber-500',
   STATE_ADMIN:     'bg-violet-500',
   AUDIT_OFFICER:   'bg-emerald-500',
   SCHEME_VERIFIER: 'bg-orange-500',
-  USER:            'bg-gray-500',
+  USER:            'bg-slate-400',
 }
 
 const SIDEBAR_BG = {
@@ -58,11 +58,11 @@ const SIDEBAR_BG = {
 }
 
 const ACTIVE_CLASS = {
-  DFO:             'border-blue-400 text-white',
+  DFO:             'border-amber-400 text-white',
   STATE_ADMIN:     'border-violet-400 text-white',
   AUDIT_OFFICER:   'border-emerald-400 text-white',
   SCHEME_VERIFIER: 'border-orange-400 text-white',
-  USER:            'border-gray-400 text-white',
+  USER:            'border-slate-400 text-white',
 }
 
 export default function Sidebar({ role, officer, onLogout }) {
@@ -84,22 +84,22 @@ export default function Sidebar({ role, officer, onLogout }) {
       {/* Brand */}
       <div className="p-5 pt-8">
         <div className="flex items-center gap-3 mb-2">
-          <Shield className="text-blue-400" size={26} strokeWidth={2.5} />
+          <Shield className="text-amber-400" size={26} strokeWidth={2.5} />
           <span className="font-bold text-xl tracking-tight font-sans">{t('sidebar.brand') || 'EduGuard'}</span>
         </div>
-        <p className="text-xs text-white/50 leading-relaxed font-data">
+        <p className="text-xs text-white/60 leading-relaxed font-data">
           {t('common.govGujarat') || 'Government of Gujarat'}<br />{t('common.dbtLeakage') || 'DBT Leakage Detection'}
         </p>
       </div>
 
       {/* Role badge — shows actual officer name + district */}
-      <div className="mx-5 mt-2 mb-4 px-3 py-2 bg-surface-lowest/5 border border-white/10 rounded-md">
+      <div className="mx-5 mt-2 mb-4 px-3 py-2 bg-surface-lowest/15 border border-border-subtle rounded-md">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${accentDot} flex-shrink-0`} />
           <span className="text-xs text-white/90 font-mono truncate">{badgeLabel}</span>
         </div>
         {officer?.name && (
-          <p className="text-[10px] text-white/50 font-data mt-1 ml-4 truncate">{officer.name}</p>
+          <p className="text-[10px] text-white/60 font-data mt-1 ml-4 truncate">{officer.name}</p>
         )}
       </div>
 
@@ -114,8 +114,8 @@ export default function Sidebar({ role, officer, onLogout }) {
               onClick={() => navigate(item.path)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-all rounded-md font-sans border-l-2
                 ${active
-                  ? `bg-surface-lowest/10 ${activeClass} border-l-2`
-                  : 'text-white/55 hover:bg-surface-lowest/5 hover:text-white border-transparent'
+                  ? `bg-surface-lowest/20 ${activeClass} border-l-2`
+                  : 'text-white/65 hover:bg-surface-lowest/15 hover:text-white border-transparent'
                 }`}
             >
               <Icon size={17} strokeWidth={active ? 2.5 : 2} />
@@ -126,17 +126,17 @@ export default function Sidebar({ role, officer, onLogout }) {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/10 space-y-0.5">
+      <div className="p-4 border-t border-border-subtle space-y-0.5">
         <LanguageToggle variant="sidebar" />
         <ThemeToggle variant="sidebar" />
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/40 hover:text-white/70 hover:bg-surface-lowest/5 rounded-md transition-all font-data"
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/65 hover:text-white hover:bg-surface-lowest/20 rounded-md transition-all font-data"
         >
           <LogOut size={14} />
           {t('common.signOut') || 'Sign out'}
         </button>
-        <p className="text-[10px] text-white/25 font-data mt-2 px-3">{t('common.systemReady') || 'AY 2024–25 · System Ready'}</p>
+        <p className="text-[10px] text-white/40 font-data mt-2 px-3">{t('common.systemReady') || 'AY 2024–25 · System Ready'}</p>
       </div>
     </aside>
   )

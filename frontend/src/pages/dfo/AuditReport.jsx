@@ -40,7 +40,7 @@ export default function AuditReport() {
           <button onClick={handleDownload} className="flex items-center gap-2 px-4 py-2 bg-surface-lowest border border-border-subtle rounded text-sm font-semibold text-text-primary hover:bg-surface-low transition-colors shadow-sm">
             <Download size={16} /> {t('auditReport.exportTxt')}
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-primary-override text-white rounded text-sm font-semibold hover:bg-blue-900 transition-colors shadow-sm">
+          <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-primary-override text-white rounded text-sm font-semibold hover:brightness-110 transition-colors shadow-sm">
             <Printer size={16} /> {t('auditReport.print')}
           </button>
         </div>

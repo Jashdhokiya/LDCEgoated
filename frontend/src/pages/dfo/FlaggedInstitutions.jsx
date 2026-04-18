@@ -95,7 +95,7 @@ export default function FlaggedInstitutions() {
               <div className="flex items-center gap-3 mt-4 pt-4 border-t border-border-subtle">
                 <button
                   onClick={() => setAssignModal(inst)}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-all"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:brightness-110 transition-all"
                 >
                   <FileSearch size={13} />
                   {t('flaggedInst.assignToVerifier')}

@@ -53,7 +53,7 @@ export default function AuditOfficerDashboard() {
         </div>
         <button 
           onClick={handleForwardToDFO}
-          className="flex items-center gap-2 px-6 py-2.5 bg-primary-override text-white rounded-sm text-sm font-bold shadow-md hover:bg-blue-900 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-primary-override text-white rounded-sm text-sm font-bold shadow-md hover:brightness-110 transition-colors"
         >
           <Send size={16} /> {t('auditOfficer.forwardReports')}
         </button>

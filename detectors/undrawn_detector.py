@@ -35,6 +35,7 @@ def detect_undrawn() -> List[Dict[str, Any]]:
                 "beneficiary_id": ben["beneficiary_id"],
                 "beneficiary_name": ben.get("name", "Unknown"),
                 "district": ben.get("district", "Unknown"),
+                "taluka": ben.get("taluka", "Unknown"),
                 "scheme": payment.get("scheme", "UNKNOWN"),
                 "payment_id": payment.get("payment_id"),
                 "payment_amount": payment.get("amount", 0),

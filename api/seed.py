@@ -54,6 +54,7 @@ DEMO_OFFICERS = [
         "email":        "audit@eduguard.in",
         "plain_password": "audit@1234",
         "district":     "Gandhinagar",
+        "taluka":       "Kalol",
         "jurisdiction": {"level": "STATE", "region_code": "Gujarat"},
         "contact":      {"email": "amit.audit@gujarat.gov.in", "phone": "+919876543212"},
         "is_active":    True,

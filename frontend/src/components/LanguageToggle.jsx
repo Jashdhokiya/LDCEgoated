@@ -12,16 +12,16 @@ export default function LanguageToggle({ variant = 'sidebar' }) {
   if (variant === 'sidebar') {
     return (
       <div className="flex items-center gap-1 px-3 py-1.5 w-full">
-        <Languages size={13} className="text-white/40 mr-1 flex-shrink-0" />
-        <div className="flex bg-white/10 rounded-md overflow-hidden">
+        <Languages size={13} className="text-white/55 mr-1 flex-shrink-0" />
+        <div className="flex bg-surface-lowest/15 border border-border-subtle rounded-md overflow-hidden">
           {pills.map(p => (
             <button
               key={p.id}
               onClick={() => setLang(p.id)}
               className={`px-2.5 py-1 text-[11px] font-bold transition-all ${
                 lang === p.id
-                  ? 'bg-blue-500 text-white'
-                  : 'text-white/50 hover:text-white/80'
+                  ? 'bg-primary-override text-white'
+                  : 'text-white/60 hover:text-white hover:bg-surface-lowest/20'
               }`}
             >
               {p.label}

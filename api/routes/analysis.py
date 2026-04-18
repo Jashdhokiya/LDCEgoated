@@ -53,16 +53,25 @@ def _col(name: str):
 
 def _district_query(user: dict) -> dict:
     """
-    Returns a MongoDB query filter scoped to the officer's district.
-    STATE_ADMIN gets {} (all data). Everyone else gets {"district": <their district>}.
+    Returns a MongoDB query filter scoped to the officer's district and taluka.
+    STATE_ADMIN gets {} (all data).
+    DFO gets {"district": <district>}.
+    VERIFIER/AUDIT gets {"district": <district>, "taluka": <taluka>}.
     """
     role = user.get("role", "")
     if role == "STATE_ADMIN":
         return {}
+    
+    query = {}
     district = user.get("district")
     if district:
-        return {"district": district}
-    return {}
+        query["district"] = district
+        
+    taluka = user.get("taluka")
+    if taluka and role == "AUDIT":
+        query["taluka"] = taluka
+        
+    return query
 
 
 def _fallback_evidence(flag: dict) -> str:
@@ -139,7 +148,11 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
     # Return only district-scoped flags to the requesting officer
     dq = _district_query(user)
     if dq:
-        scoped = [f for f in enriched if f.get("district") == dq.get("district")]
+        scoped = enriched
+        if dq.get("district"):
+            scoped = [f for f in scoped if f.get("district") == dq["district"]]
+        if dq.get("taluka"):
+            scoped = [f for f in scoped if f.get("taluka") == dq["taluka"]]
     else:
         scoped = enriched
 

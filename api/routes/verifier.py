@@ -132,6 +132,25 @@ async def my_cases(user: dict = Depends(require_role("SCHEME_VERIFIER"))):
     if not all_cases:
         flag_store = _get_flags_from_memory()
         all_flags = sorted(flag_store.values(), key=lambda x: x.get("risk_score", 0), reverse=True)
+        
+        # If no flags in memory, try fetching from mongo
+        if not all_flags:
+            col = _col("flags")
+            if col is not None:
+                try:
+                    all_flags = list(col.find({}, {"_id": 0}).sort("risk_score", -1))
+                except Exception:
+                    pass
+
+        # Apply district and taluka filters
+        # Reverted per user request: "do this for auditer only currently"
+        # district = user.get("district")
+        # taluka = user.get("taluka")
+        # if district:
+        #     all_flags = [f for f in all_flags if f.get("district") == district]
+        # if taluka:
+        #     all_flags = [f for f in all_flags if f.get("taluka") == taluka]
+
         demo_cases = []
         for f in all_flags:
             if f.get("status") in ("OPEN", "ASSIGNED"):
