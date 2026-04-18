@@ -1,0 +1,80 @@
+{
+  "schemes": {
+    "NLY": {
+      "name": "Namo Lakshmi Yojana",
+      "eligible_gender": [
+        "F"
+      ],
+      "eligible_standards": [
+        9,
+        10,
+        11,
+        12
+      ],
+      "eligible_streams": null,
+      "min_marks_pct": null,
+      "amount_fixed": 25000,
+      "amount_variable": false,
+      "incompatible_with": [
+        "NSVSY"
+      ],
+      "description": "Financial support for girls in secondary education"
+    },
+    "NSVSY": {
+      "name": "Namo Saraswati Vigyan Sadhana Yojana",
+      "eligible_gender": [
+        "F"
+      ],
+      "eligible_standards": [
+        11,
+        12
+      ],
+      "eligible_streams": [
+        "Science"
+      ],
+      "min_marks_pct": null,
+      "amount_fixed": 10000,
+      "amount_variable": false,
+      "incompatible_with": [
+        "NLY"
+      ],
+      "description": "Support for girls pursuing Science stream"
+    },
+    "MGMS": {
+      "name": "Mukhyamantri Gyan Sadhana Merit Scholarship",
+      "eligible_gender": null,
+      "eligible_standards": [
+        9,
+        10,
+        11,
+        12
+      ],
+      "eligible_streams": null,
+      "min_marks_pct": 75.0,
+      "amount_variable": true,
+      "amount_tiers": [
+        {
+          "min_marks": 90,
+          "amount": 20000
+        },
+        {
+          "min_marks": 80,
+          "amount": 10000
+        },
+        {
+          "min_marks": 75,
+          "amount": 5000
+        }
+      ],
+      "incompatible_with": [],
+      "description": "Merit-based scholarship for high-scoring students"
+    }
+  },
+  "undrawn_threshold_days": 60,
+  "cross_scheme_forbidden_pairs": [
+    [
+      "NLY",
+      "NSVSY"
+    ]
+  ]
+}

@@ -1,0 +1,362 @@
+[
+  {
+    "beneficiary_id": "BEN-GJ-19-5293",
+    "aadhaar_hash": "d9755f033e57f8501956b0eadde197f5794bfe69590885c58396e29b3a420dff",
+    "name": "Ishani Modi",
+    "death_date": "2024-04-07",
+    "district": "Valsad",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-21-5941",
+    "aadhaar_hash": "f65dd5b4dbd24af03d014502374d78896841c94ab80b9d565a6a0f87306077b7",
+    "name": "Siddhi Vasava",
+    "death_date": "2024-04-17",
+    "district": "Narmada",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-28-7718",
+    "aadhaar_hash": "cf994c1bef98338c653e7c33717248e05aa4297022bae776090e9640d1a2eed7",
+    "name": "Dhara Vaghela",
+    "death_date": "2024-06-25",
+    "district": "Porbandar",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-23-6486",
+    "aadhaar_hash": "db5b87bea1d79e6d6e145aa408396cebba6982df6e5a74db152639185bd03959",
+    "name": "Mital Desai",
+    "death_date": "2024-06-13",
+    "district": "Aravalli",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-20-5614",
+    "aadhaar_hash": "41ce84e72d293fb9c71051a4b2d16c8e77a5bde03c11ba4a76a71be57ea41ecd",
+    "name": "Nidhi Chaudhary",
+    "death_date": "2024-06-18",
+    "district": "Tapi",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-02-0501",
+    "aadhaar_hash": "4485b86f6b66a6872eaeb3a24f8eaa3b3b05e61839fadf5b90ffc579234cfb88",
+    "name": "Kavya Vasava",
+    "death_date": "2024-09-26",
+    "district": "Surat",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-25-7138",
+    "aadhaar_hash": "652d60261f0ed639d0dae98913e369f55518a2f4f794f109dba3690437750aae",
+    "name": "Bhumika Modi",
+    "death_date": "2024-04-26",
+    "district": "Botad",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-02-0538",
+    "aadhaar_hash": "7aef37d41d18f67b0d367ccbb56a5e363226ca3eb2da25e509e9adfecff7d9ba",
+    "name": "Nidhi Trivedi",
+    "death_date": "2024-07-12",
+    "district": "Surat",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-22-6157",
+    "aadhaar_hash": "bb86b1594652bddbf09a2ef9bf9734dcd683a76ebb9f55d577060c64b7da7f90",
+    "name": "Nidhi Vasava",
+    "death_date": "2024-04-25",
+    "district": "Chhota Udaipur",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-22-6255",
+    "aadhaar_hash": "50c6c316b313a3dff1242f295b2783b17a549664e83c31b1d158edc7f4bb3c01",
+    "name": "Pooja Joshi",
+    "death_date": "2024-10-22",
+    "district": "Chhota Udaipur",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-18-4967",
+    "aadhaar_hash": "288516def1f89e56fdb4805ce8cf121d214807095acc4def92d6316e384e7473",
+    "name": "Dhruti Chauhan",
+    "death_date": "2024-08-19",
+    "district": "Navsari",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-25-6869",
+    "aadhaar_hash": "5c2dce056a563ea6e29584b1e696f3af68e4db96bac84871a9b3a395be2eaf26",
+    "name": "Foram Mehta",
+    "death_date": "2024-04-29",
+    "district": "Botad",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-14-3753",
+    "aadhaar_hash": "e2b0e391646e5f131f6f232104e75d876abf8632099bf0e4f864d3ce41c376be",
+    "name": "Ankita Chaudhary",
+    "death_date": "2024-10-14",
+    "district": "Kheda",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-09-2317",
+    "aadhaar_hash": "cbf80c4b7ac40343cce71b1c0e9bf39ed4e1c60d1610f4ef3b283e13989c9eb4",
+    "name": "Dhara Desai",
+    "death_date": "2024-06-16",
+    "district": "Anand",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-15-4012",
+    "aadhaar_hash": "62ba8ad58b057d8204434e56f1b8d9a11a7b815db3f61b885e25fb6398174de2",
+    "name": "Khushi Modi",
+    "death_date": "2024-01-14",
+    "district": "Panchmahals",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-16-4491",
+    "aadhaar_hash": "60ead1029129db2be8d10d7fd4a33b4b1393c588b368a73eb774f009f5cbc8c3",
+    "name": "Shreya Gamit",
+    "death_date": "2024-06-09",
+    "district": "Dahod",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-12-3345",
+    "aadhaar_hash": "b422f1a26367f9a5b4bbdb5ff96ceb032c3eac701f732ecfdc622940e888beba",
+    "name": "Nency Patel",
+    "death_date": "2024-05-27",
+    "district": "Banaskantha",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-06-1671",
+    "aadhaar_hash": "497c35d5b79139f619af9b90e62386d1f80465ccd79c686f048d5aa22e4ec794",
+    "name": "Jay Rathod",
+    "death_date": "2024-08-24",
+    "district": "Bhavnagar",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-18-5139",
+    "aadhaar_hash": "584f7292cc3757edf2a76ab33302bfac9d01137d3d59398e6bccb1516f33da14",
+    "name": "Nikhil Desai",
+    "death_date": "2024-05-22",
+    "district": "Navsari",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-02-0361",
+    "aadhaar_hash": "8cce88f212fa8e2d37ee2d6050de6cbe24e24ab92f2ce6b0ecaea88dff50c9ba",
+    "name": "Mansi Damor",
+    "death_date": "2024-09-06",
+    "district": "Surat",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-16-4292",
+    "aadhaar_hash": "38f8397b27db797ad23b279d3b386a30dc0c69f3e1366afc4c6e8790588d0cba",
+    "name": "Kinjal Patel",
+    "death_date": "2024-09-07",
+    "district": "Dahod",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-11-2967",
+    "aadhaar_hash": "c9180abc721a7355d1b4a6d0d2393835fedc2badfb89e89e7a09fc7dcb52de93",
+    "name": "Kavya Modi",
+    "death_date": "2024-01-19",
+    "district": "Patan",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-10-2633",
+    "aadhaar_hash": "8738a5e76beb3b08a97782917a9db9d49170c75b9fc3cfac1523e66b2e083e41",
+    "name": "Dhruti Rathod",
+    "death_date": "2024-07-13",
+    "district": "Mehsana",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-06-1667",
+    "aadhaar_hash": "7cad94d935b53d0d5f9c78f3d963a64aa57904adf561277beb4002b248f77c4c",
+    "name": "Mital Shah",
+    "death_date": "2024-09-14",
+    "district": "Bhavnagar",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-01-0267",
+    "aadhaar_hash": "35d60f3f6fe3597faf8f8cf94048b7dda7e07eeb0350c9e825af032b1d7a5d63",
+    "name": "Dhruti Baria",
+    "death_date": "2024-04-22",
+    "district": "Ahmedabad",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-27-7504",
+    "aadhaar_hash": "2b5f122cc4513dfe9c7a758324ae10802d622b71a2104799588b36aa2d417d11",
+    "name": "Priya Patel",
+    "death_date": "2024-11-13",
+    "district": "Devbhoomi Dwarka",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-04-0946",
+    "aadhaar_hash": "a39dfdede246d1ac7218de38cbe0de3877cb2b51eca6346d81c4a4508012a4f2",
+    "name": "Ankita Modi",
+    "death_date": "2024-01-29",
+    "district": "Rajkot",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-24-6586",
+    "aadhaar_hash": "1b97c7ea27e81b5b70536bdf9b5c48f6ddfc663bbdf57b92c260c69b9e383681",
+    "name": "Khushi Modi",
+    "death_date": "2024-02-09",
+    "district": "Morbi",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-11-2910",
+    "aadhaar_hash": "0fdce55b31af06e676508c0407ae894041ce43dc5b99caab9116d29ddf3b39a6",
+    "name": "Mansi Joshi",
+    "death_date": "2024-11-13",
+    "district": "Patan",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-06-1601",
+    "aadhaar_hash": "df4a6496e56ddfab1b8093fadd1cb41f73adfee3b1835a9a87f5d66950fb86ed",
+    "name": "Riddhi Desai",
+    "death_date": "2024-08-26",
+    "district": "Bhavnagar",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-26-7358",
+    "aadhaar_hash": "2c2dc0a34ba80f15c27a58cdf59df13e6c08336454c6f34b9c4ad77771befdf3",
+    "name": "Zalak Chauhan",
+    "death_date": "2024-05-30",
+    "district": "Gir Somnath",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-20-5449",
+    "aadhaar_hash": "58bd1207dd6b7ae7d30a39dcc15bbaeeab0a3823ba12be9b99116457c25c317e",
+    "name": "Payal Patel",
+    "death_date": "2024-08-13",
+    "district": "Tapi",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-26-7195",
+    "aadhaar_hash": "e46da3ae8cfd81c2832d2a528636a797f28bba8aaf56000624cc0274d5f48ff7",
+    "name": "Prem Mehta",
+    "death_date": "2024-04-30",
+    "district": "Gir Somnath",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-14-3841",
+    "aadhaar_hash": "a5ea76b8d28c96e7ac16ce3afd064db79974b66d89756da128e6acb104fda7ef",
+    "name": "Raj Rathod",
+    "death_date": "2024-10-29",
+    "district": "Kheda",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-19-5339",
+    "aadhaar_hash": "1d25a5f3a2f2660dd078cc31388658c970ead5ccc62bb44e61e7d2e532db8d89",
+    "name": "Bhumika Rathod",
+    "death_date": "2024-09-06",
+    "district": "Valsad",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-20-5489",
+    "aadhaar_hash": "b3e0f1f5c55bf4e1a7cc8288a36665eed5f146a0f6676462233726de3f479651",
+    "name": "Dhara Gamit",
+    "death_date": "2024-08-05",
+    "district": "Tapi",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-18-4947",
+    "aadhaar_hash": "8951c131750b3594d1bc5d12d46a426335526b6173c47c00333e5eca355ec51d",
+    "name": "Nency Patel",
+    "death_date": "2024-03-30",
+    "district": "Navsari",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-18-5089",
+    "aadhaar_hash": "f46000d7b6fb4ba8763176ca88db49729d8138d9c8d7b9a28511d0d6352e5d9b",
+    "name": "Yash Baria",
+    "death_date": "2024-12-02",
+    "district": "Navsari",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-12-3208",
+    "aadhaar_hash": "e230ca80063ebb9f3d21cbb1d26bfda353beef9627d939e076214aba42e05056",
+    "name": "Ishani Chauhan",
+    "death_date": "2024-04-27",
+    "district": "Banaskantha",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-16-4322",
+    "aadhaar_hash": "5715e794efce277761184645aa5c905fbadd2b3a80db11947ce5185233e01923",
+    "name": "Nency Desai",
+    "death_date": "2024-06-06",
+    "district": "Dahod",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-21-5949",
+    "aadhaar_hash": "603a464fb773680414742ffbb4f11416c7e060cf4c09569b595a7291a6748a80",
+    "name": "Khushi Joshi",
+    "death_date": "2024-09-10",
+    "district": "Narmada",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-20-5494",
+    "aadhaar_hash": "1a01709207b487ef20a94a6d95d3df3ffd0a72d417259d44b51eeec69bfed806",
+    "name": "Hetal Solanki",
+    "death_date": "2024-06-21",
+    "district": "Tapi",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-23-6571",
+    "aadhaar_hash": "a07e3659a0bdae6a39d9e033543d715d95ff80677f83fbb649155b44617f0fe8",
+    "name": "Hetal Modi",
+    "death_date": "2024-09-12",
+    "district": "Aravalli",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-08-2013",
+    "aadhaar_hash": "82131dc59811a50f3dac94a20e8c109ebeed30b35ff347ec16b76633d0da74c0",
+    "name": "Ankita Trivedi",
+    "death_date": "2024-07-14",
+    "district": "Junagadh",
+    "registration_source": "Municipal Corporation"
+  },
+  {
+    "beneficiary_id": "BEN-GJ-18-5036",
+    "aadhaar_hash": "287be39d7289d0c31e63e86870f219310277747eccb34452eeabc6d56195c680",
+    "name": "Dhara Solanki",
+    "death_date": "2024-04-17",
+    "district": "Navsari",
+    "registration_source": "Municipal Corporation"
+  }
+]
