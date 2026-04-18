@@ -1,30 +1,25 @@
 """
 api/routes/user.py
-General User (beneficiary) endpoints — KYC excluded as per spec.
-GET  /api/user/profile              — own profile + registered schemes
-GET  /api/user/schemes              — own registered scheme applications
+General User (citizen) endpoints — all data from MongoDB.
+GET  /api/user/profile              — own profile
+PUT  /api/user/complete-profile     — mandatory profile completion
+POST /api/user/kyc                  — mark KYC complete
+GET  /api/user/schemes              — own payment/scheme history
 GET  /api/user/payments             — own payment history
+GET  /api/user/eligible-schemes     — schemes user qualifies for
 """
-import json
-import os
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from ..deps import require_role
 
 router = APIRouter(prefix="/api/user", tags=["user"])
 
-DATA_PATH = os.getenv("DATA_PATH", "./data")
 
-
-def _load_json(filename: str, default=None):
-    try:
-        with open(os.path.join(DATA_PATH, filename), encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return default if default is not None else []
-
+# ── MongoDB helpers ──────────────────────────────────────────────────────────
 
 def _get_db():
     try:
@@ -36,74 +31,117 @@ def _get_db():
 
 def _col(name: str):
     db = _get_db()
-    return db[name] if db is not None else None
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    return db[name]
 
 
-# ── Fallback profile ──────────────────────────────────────────────────────────
+# ── Pydantic models ──────────────────────────────────────────────────────────
 
-FALLBACK_USER = {
-    "user_id":         "USR-GJ-001",
-    "full_name":       "Karan Patel",
-    "aadhaar_display": "XXXX-XXXX-4964",
-    "phone":           "+91 98765 43210",
-    "demographics": {
-        "district": "Ahmedabad", "taluka": "Sanand",
-        "gender": "M", "dob": "2006-05-14", "category": "OBC",
-    },
-    "bank": {
-        "bank": "SBI", "account_display": "XXXXXX3421", "ifsc": "SBIN0001234"
-    },
-    "registered_schemes": [
-        {"scheme_id": "SCH-MGMS", "name": "Mukhyamantri Gyan Sadhana Merit Scholarship",
-         "status": "ACTIVE", "registration_date": "2025-08-15",
-         "amount": 20000, "last_payment": "2025-11-01", "next_payment": "2026-04-01"},
-        {"scheme_id": "SCH-NLY",  "name": "Namo Lakshmi Yojana",
-         "status": "PENDING_VERIFICATION", "registration_date": "2026-01-10",
-         "amount": 25000, "last_payment": None, "next_payment": None},
-    ],
-    "kyc_profile": {
-        "is_kyc_compliant": True,
-        "days_remaining": 42,
-        "kyc_expiry_date": "2026-05-31",
-        "last_kyc_date": "2026-03-02",
-        "dynamic_validity_days": 90,
-    },
-}
+class ProfileCompletionRequest(BaseModel):
+    phone: str
+    district: str
+    taluka: str
+    gender: str                    # M | F | OTHER
+    dob: str                       # YYYY-MM-DD
+    caste_category: str            # GENERAL | OBC | SC | ST | EWS
+    income: Optional[float] = None # annual family income
+    bank_name: Optional[str] = None
+    bank_account_display: Optional[str] = None  # last 4 digits
+    bank_ifsc: Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/profile")
 async def get_profile(user: dict = Depends(require_role("USER"))):
+    """Returns the authenticated user's profile from the users collection."""
+    uid = user["sub"]
+    col = _col("users")
+    doc = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
+
+    if not doc:
+        # Minimal response if somehow not found
+        return {
+            "user_id": uid,
+            "name": user.get("name", "Citizen"),
+            "profile_complete": False,
+            "kyc_complete": False,
+        }
+
+    # Attach payment history
+    pay_col = _col("payment_ledger")
+    payments = list(pay_col.find({"beneficiary_id": uid}, {"_id": 0}))
+    doc["registered_schemes"] = payments
+
+    return doc
+
+
+@router.put("/complete-profile")
+async def complete_profile(
+    body: ProfileCompletionRequest,
+    user: dict = Depends(require_role("USER")),
+):
     """
-    Returns the authenticated user's profile.
-    Uses `sub` (officer_id = beneficiary_id) from the JWT to look up the record.
+    Mandatory profile completion for new citizen accounts.
+    Must be called before user can access their dashboard.
     """
     uid = user["sub"]
+    col = _col("users")
 
-    # Try MongoDB beneficiaries collection first
-    col = _col("beneficiaries")
-    if col is not None:
-        try:
-            doc = col.find_one({"beneficiary_id": uid}, {"_id": 0, "aadhaar_hash": 0, "bank_account_hash": 0})
-            if doc:
-                # Merge registered schemes from payments
-                pay_col = _col("payment_ledger")
-                schemes: list = []
-                if pay_col is not None:
-                    payments = list(pay_col.find({"beneficiary_id": uid}, {"_id": 0}))
-                    schemes = payments
-                doc["registered_schemes"] = schemes
-                return doc
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
+    existing = col.find_one({"user_id": uid})
+    if not existing:
+        raise HTTPException(404, "User not found")
 
-    # Fallback — use hardcoded profile (correct user only)
-    if uid == "USR-GJ-001":
-        return FALLBACK_USER
+    update = {
+        "phone":          body.phone.strip(),
+        "district":       body.district.strip(),
+        "taluka":         body.taluka.strip(),
+        "gender":         body.gender.strip().upper(),
+        "dob":            body.dob.strip(),
+        "caste_category": body.caste_category.strip().upper(),
+        "income":         body.income,
+        "bank": {
+            "bank_name":        body.bank_name or "",
+            "account_display":  body.bank_account_display or "",
+            "ifsc":             body.bank_ifsc or "",
+        },
+        "profile_complete": True,
+        "profile_completed_at": datetime.utcnow().isoformat(),
+    }
 
-    # Generic fallback for demo
-    return {**FALLBACK_USER, "user_id": uid, "full_name": user.get("name", "Beneficiary")}
+    col.update_one({"user_id": uid}, {"$set": update})
+    updated = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
+    return updated
+
+
+@router.post("/kyc")
+async def complete_kyc(user: dict = Depends(require_role("USER"))):
+    """Mark KYC as complete for the authenticated user."""
+    uid = user["sub"]
+    col = _col("users")
+
+    existing = col.find_one({"user_id": uid})
+    if not existing:
+        raise HTTPException(404, "User not found")
+
+    if not existing.get("profile_complete"):
+        raise HTTPException(400, "Complete your profile first")
+
+    update = {
+        "kyc_complete": True,
+        "kyc_completed_at": datetime.utcnow().isoformat(),
+        "kyc_profile": {
+            "is_kyc_compliant": True,
+            "days_remaining": 365,
+            "kyc_expiry_date": "2027-04-19",
+            "last_kyc_date": datetime.utcnow().strftime("%Y-%m-%d"),
+            "dynamic_validity_days": 365,
+        },
+    }
+
+    col.update_one({"user_id": uid}, {"$set": update})
+    return {"message": "KYC completed successfully", "kyc_complete": True}
 
 
 @router.get("/schemes")
@@ -111,20 +149,8 @@ async def get_user_schemes(user: dict = Depends(require_role("USER"))):
     """Returns scheme applications for the authenticated user."""
     uid = user["sub"]
     col = _col("payment_ledger")
-    if col is not None:
-        try:
-            docs = list(col.find({"beneficiary_id": uid}, {"_id": 0}))
-            if docs:
-                return {"user_id": uid, "count": len(docs), "schemes": docs}
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
-
-    # JSON file fallback
-    payments = [p for p in _load_json("payment_ledger.json") if p.get("beneficiary_id") == uid]
-    if payments:
-        return {"user_id": uid, "count": len(payments), "schemes": payments}
-
-    return {"user_id": uid, "count": len(FALLBACK_USER["registered_schemes"]), "schemes": FALLBACK_USER["registered_schemes"]}
+    docs = list(col.find({"beneficiary_id": uid}, {"_id": 0}))
+    return {"user_id": uid, "count": len(docs), "schemes": docs}
 
 
 @router.get("/payments")
@@ -132,12 +158,32 @@ async def get_user_payments(user: dict = Depends(require_role("USER"))):
     """Returns full payment history for the authenticated user."""
     uid = user["sub"]
     col = _col("payment_ledger")
-    if col is not None:
-        try:
-            docs = list(col.find({"beneficiary_id": uid}, {"_id": 0}).sort("payment_date", -1))
-            return {"user_id": uid, "count": len(docs), "payments": docs}
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"Database unavailable: {exc}")
+    docs = list(col.find({"beneficiary_id": uid}, {"_id": 0}).sort("payment_date", -1))
+    return {"user_id": uid, "count": len(docs), "payments": docs}
 
-    payments = [p for p in _load_json("payment_ledger.json") if p.get("beneficiary_id") == uid]
-    return {"user_id": uid, "count": len(payments), "payments": payments}
+
+@router.get("/eligible-schemes")
+async def get_eligible_schemes(user: dict = Depends(require_role("USER"))):
+    """Returns schemes the user is eligible for based on profile data."""
+    uid = user["sub"]
+
+    users_col = _col("users")
+    profile = users_col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
+    if not profile or not profile.get("profile_complete"):
+        return {"eligible": [], "message": "Complete your profile to see eligible schemes"}
+
+    schemes_col = _col("schemes")
+    all_schemes = list(schemes_col.find({"status": "ACTIVE"}, {"_id": 0}))
+
+    gender = profile.get("gender", "")
+    eligible = []
+
+    for s in all_schemes:
+        rules = s.get("eligibility_rules", {})
+        # Gender check
+        allowed_genders = rules.get("gender")
+        if allowed_genders and gender not in allowed_genders:
+            continue
+        eligible.append(s)
+
+    return {"eligible": eligible, "profile": {"gender": gender, "district": profile.get("district"), "caste": profile.get("caste_category")}}

@@ -5,7 +5,6 @@
  * - Reads/writes the JWT from localStorage under key "eduguard_token"
  * - Attaches Authorization: Bearer <token> to every request
  * - On 401 → dispatches a custom "auth:expired" event so the app can reset
- * - Every exported function has a safe() wrapper that never throws to the caller
  */
 import axios from 'axios'
 
@@ -27,16 +26,12 @@ export const tokenStore = {
 
 const client = axios.create({ baseURL: BASE })
 
-// Request interceptor → attach bearer token
 client.interceptors.request.use((config) => {
   const token = tokenStore.get()
-  if (token) {
-    config.headers['Authorization'] = `Bearer ${token}`
-  }
+  if (token) config.headers['Authorization'] = `Bearer ${token}`
   return config
 })
 
-// Response interceptor → handle 401 globally
 client.interceptors.response.use(
   (res) => res,
   (err) => {
@@ -49,8 +44,6 @@ client.interceptors.response.use(
 )
 
 // ── Safe wrapper ──────────────────────────────────────────────────────────────
-// Catches any network / auth error and returns `fallback` instead.
-// Usage: const data = await safe(() => client.get('/api/dfo/dashboard'), [])
 
 async function safe(fn, fallback = null) {
   try {
@@ -64,11 +57,16 @@ async function safe(fn, fallback = null) {
   }
 }
 
-// ── AUTH ─────────────────────────────────────────────────────────────────────
+// ── AUTH — Officer login (by role + district + taluka + password) ─────────────
 
-export async function login(email, password) {
-  // Login is unauthenticated, use plain axios
-  const res = await axios.post(`${BASE}/api/auth/login`, { email, password })
+export async function loginOfficer(role, district, taluka, password) {
+  const res = await axios.post(`${BASE}/api/auth/login`, {
+    mode: 'officer',
+    role,
+    district: district || '',
+    taluka: taluka || '',
+    password,
+  })
   const data = res.data
   tokenStore.set(data.access_token)
   tokenStore.setUser({
@@ -76,8 +74,56 @@ export async function login(email, password) {
     role:       data.role,
     name:       data.name,
     district:   data.district,
+    profile_complete: data.profile_complete ?? true,
   })
   return data
+}
+
+// ── AUTH — User login (by aadhaar_hash + password) ────────────────────────────
+
+export async function loginUser(aadhaarHash, password) {
+  const res = await axios.post(`${BASE}/api/auth/login`, {
+    mode: 'user',
+    aadhaar_hash: aadhaarHash,
+    password,
+  })
+  const data = res.data
+  tokenStore.set(data.access_token)
+  tokenStore.setUser({
+    officer_id: data.officer_id,
+    role:       data.role,
+    name:       data.name,
+    district:   data.district,
+    profile_complete: data.profile_complete ?? false,
+  })
+  return data
+}
+
+// ── AUTH — User registration (aadhaar + name + password) ──────────────────────
+
+export async function registerUser(name, aadhaarHash, password) {
+  const res = await axios.post(`${BASE}/api/auth/register`, {
+    name,
+    aadhaar_hash: aadhaarHash,
+    password,
+  })
+  const data = res.data
+  tokenStore.set(data.access_token)
+  tokenStore.setUser({
+    officer_id: data.officer_id,
+    role:       data.role,
+    name:       data.name,
+    district:   data.district,
+    profile_complete: data.profile_complete ?? false,
+  })
+  return data
+}
+
+// ── AUTH — Legacy login (still used by some components) ───────────────────────
+
+export async function login(email, password) {
+  // Backwards compat: treat as officer login with email-derived info
+  return loginOfficer('DFO', '', '', password)
 }
 
 export async function logout() {
@@ -87,6 +133,12 @@ export async function logout() {
 
 export async function getMe() {
   return safe(() => client.get('/api/auth/me'))
+}
+
+// ── Geography (for login dropdowns) ──────────────────────────────────────────
+
+export async function getGeography() {
+  return safe(() => client.get('/api/auth/geography'), [])
 }
 
 // ── HEALTH ────────────────────────────────────────────────────────────────────
@@ -220,6 +272,16 @@ export async function getUser() {
   return safe(() => client.get('/api/user/profile'), null)
 }
 
+export async function completeProfile(profileData) {
+  const res = await client.put('/api/user/complete-profile', profileData)
+  return res.data
+}
+
+export async function completeKYC() {
+  const res = await client.post('/api/user/kyc')
+  return res.data
+}
+
 export async function getUserSchemes() {
   return safe(() => client.get('/api/user/schemes'), { count: 0, schemes: [] })
 }
@@ -228,12 +290,15 @@ export async function getUserPayments() {
   return safe(() => client.get('/api/user/payments'), { count: 0, payments: [] })
 }
 
-// KYC excluded per spec — placeholder only
-export async function renewKYC() {
-  return { success: true, message: 'KYC renewal not yet wired to backend' }
+export async function getEligibleSchemes() {
+  return safe(() => client.get('/api/user/eligible-schemes'), { eligible: [] })
 }
 
-// ── Legacy compatibility (old dashboard components use api.runAnalysis etc.) ──
+export async function renewKYC() {
+  return completeKYC()
+}
+
+// ── Legacy compatibility ──────────────────────────────────────────────────────
 
 export const api = {
   runAnalysis:     () => client.post('/api/run-analysis', { run_id: 'demo-001' }),

@@ -22,7 +22,7 @@ export const DEFAULT_PATHS = {
 export function AuthProvider({ children }) {
   const [role, setRole]       = useState(null)
   const [officer, setOfficer] = useState(null)
-  const [loading, setLoading] = useState(() => !!tokenStore.get()) // true only if there's a token to validate
+  const [loading, setLoading] = useState(() => !!tokenStore.get())
 
   // ── Restore session from localStorage on mount ────────────────────────
   useEffect(() => {
@@ -34,7 +34,13 @@ export function AuthProvider({ children }) {
       getMe()
         .then(me => {
           if (me?.role) {
-            setOfficer(storedUser)
+            // Update profile_complete from server
+            const updatedUser = {
+              ...storedUser,
+              profile_complete: me.profile_complete ?? storedUser.profile_complete ?? true,
+            }
+            tokenStore.setUser(updatedUser)
+            setOfficer(updatedUser)
             setRole(frontendRole)
           } else {
             tokenStore.clear()
@@ -58,6 +64,16 @@ export function AuthProvider({ children }) {
   const handleLogin = (frontendRole, data) => {
     setRole(frontendRole)
     setOfficer(data || null)
+    // Update localStorage with profile_complete
+    if (data) {
+      tokenStore.setUser({
+        officer_id:       data.officer_id,
+        role:             data.role,
+        name:             data.name,
+        district:         data.district,
+        profile_complete: data.profile_complete ?? true,
+      })
+    }
   }
 
   const handleLogout = async () => {
