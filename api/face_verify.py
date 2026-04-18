@@ -19,6 +19,7 @@ import io
 import logging
 import os
 import urllib.request
+import uuid
 from typing import Optional, Tuple
 
 import cv2
@@ -48,16 +49,30 @@ if CLOUDINARY_ENABLED:
 else:
     logger.warning("[face_verify] Cloudinary not configured. Falling back to MongoDB base64 storage.")
 
-# Load Haar cascade for frontal face detection
-_FACE_CASCADE = None
+# Deep Learning Models (YuNet for detection, SFace for recognition)
+_DETECTOR = None
+_RECOGNIZER = None
 
 
-def _get_cascade():
-    global _FACE_CASCADE
-    if _FACE_CASCADE is None:
-        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        _FACE_CASCADE = cv2.CascadeClassifier(cascade_path)
-    return _FACE_CASCADE
+def _get_dnn_models():
+    global _DETECTOR, _RECOGNIZER
+    if _DETECTOR is None or _RECOGNIZER is None:
+        os.makedirs("data/models", exist_ok=True)
+        yunet_path = "data/models/yunet.onnx"
+        sface_path = "data/models/sface.onnx"
+        
+        if not os.path.exists(yunet_path):
+            logger.info("[face_verify] Downloading YuNet face detection model...")
+            urllib.request.urlretrieve("https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx", yunet_path)
+            
+        if not os.path.exists(sface_path):
+            logger.info("[face_verify] Downloading SFace recognition model...")
+            urllib.request.urlretrieve("https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx", sface_path)
+
+        _DETECTOR = cv2.FaceDetectorYN_create(yunet_path, "", (320, 320))
+        _RECOGNIZER = cv2.FaceRecognizerSF_create(sface_path, "")
+        
+    return _DETECTOR, _RECOGNIZER
 
 
 def upload_face(b64_string: str) -> str:
@@ -83,11 +98,26 @@ def upload_face(b64_string: str) -> str:
         return url or b64_string
     except Exception as e:
         logger.error(f"[face_verify] Cloudinary upload failed: {e}")
+        
+    # Local fallback if Cloudinary isn't configured or failed
+    try:
+        os.makedirs("data/faces", exist_ok=True)
+        filename = f"data/faces/face_{uuid.uuid4().hex[:8]}.jpg"
+        
+        # Decode and save locally
+        clean_b64 = b64_string.split(",", 1)[1] if "," in b64_string else b64_string
+        img_bytes = base64.b64decode(clean_b64)
+        with open(filename, "wb") as f:
+            f.write(img_bytes)
+        logger.info(f"[face_verify] Saved face locally: {filename}")
+        return filename
+    except Exception as fallback_e:
+        logger.error(f"[face_verify] Local fallback failed: {fallback_e}")
         return b64_string
 
 
 def _b64_to_cv2(image_data: str) -> Optional[np.ndarray]:
-    """Decode a base64 image string OR download from a URL to an OpenCV BGR image."""
+    """Decode a base64 image string OR download from a URL OR load from local path."""
     try:
         if image_data.startswith("http://") or image_data.startswith("https://"):
             # It's a URL
@@ -95,6 +125,10 @@ def _b64_to_cv2(image_data: str) -> Optional[np.ndarray]:
             arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
             img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
             return img
+
+        if os.path.exists(image_data):
+            # It's a local file path
+            return cv2.imread(image_data, cv2.IMREAD_COLOR)
 
         # Strip data URL prefix if present for base64
         if "," in image_data:
@@ -108,56 +142,54 @@ def _b64_to_cv2(image_data: str) -> Optional[np.ndarray]:
         return None
 
 
-def _detect_face(img: np.ndarray) -> Optional[np.ndarray]:
-    """Detect the largest face in an image and return the cropped face region."""
-    cascade = _get_cascade()
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
-
-    if len(faces) == 0:
+def _extract_embedding(img: np.ndarray) -> Optional[np.ndarray]:
+    """Detect the largest face using YuNet and extract SFace embedding."""
+    detector, recognizer = _get_dnn_models()
+    h, w = img.shape[:2]
+    
+    # Needs to match image size exactly for YuNet
+    detector.setInputSize((w, h))
+    _, faces = detector.detect(img)
+    
+    if faces is None or len(faces) == 0:
         return None
 
-    # Pick the largest face
-    (x, y, w, h) = max(faces, key=lambda f: f[2] * f[3])
-    face_crop = img[y:y + h, x:x + w]
-
-    # Resize to standard size for comparison
-    face_crop = cv2.resize(face_crop, (160, 160))
-    return face_crop
+    # faces[i] format is [x, y, w, h, x_re, y_re, x_le, y_le, x_nt, y_nt, x_rcm, y_rcm, x_lcm, y_lcm, score]
+    # Pick the highest-scored face (last element is score, but usually sorted)
+    best_face = max(faces, key=lambda f: f[-1])
+    
+    aligned_face = recognizer.alignCrop(img, best_face)
+    embedding = recognizer.feature(aligned_face)
+    return embedding
 
 
 def detect_face_in_image(b64_image: str) -> dict:
     """
-    Check if a face is present in the given base64 image.
-    Returns detection result with face count and bounding boxes.
+    Check if a face is present in the given image string.
+    Returns detection result with face count and bounding boxes via YuNet.
     """
     img = _b64_to_cv2(b64_image)
     if img is None:
         return {"face_detected": False, "face_count": 0, "error": "Invalid image"}
 
-    cascade = _get_cascade()
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+    detector, _ = _get_dnn_models()
+    h, w = img.shape[:2]
+    detector.setInputSize((w, h))
+    _, faces = detector.detect(img)
+
+    if faces is None:
+        return {"face_detected": False, "face_count": 0, "faces": []}
 
     return {
         "face_detected": len(faces) > 0,
         "face_count": len(faces),
-        "faces": [{"x": int(x), "y": int(y), "w": int(w), "h": int(h)} for (x, y, w, h) in faces],
+        "faces": [{"x": float(f[0]), "y": float(f[1]), "w": float(f[2]), "h": float(f[3])} for f in faces]
     }
 
 
 def verify_faces(reference_b64: str, probe_b64: str) -> dict:
     """
-    Compare a probe (new) face image against a stored reference image.
-
-    Returns:
-        {
-            "match": bool,
-            "confidence": float (0-100),
-            "details": str,
-            "face_detected_ref": bool,
-            "face_detected_probe": bool,
-        }
+    Compare a probe (new) face image against a stored reference using SFace.
     """
     ref_img = _b64_to_cv2(reference_b64)
     probe_img = _b64_to_cv2(probe_b64)
@@ -169,66 +201,38 @@ def verify_faces(reference_b64: str, probe_b64: str) -> dict:
         return {"match": False, "confidence": 0, "details": "Could not decode probe image",
                 "face_detected_ref": False, "face_detected_probe": False}
 
-    ref_face = _detect_face(ref_img)
-    probe_face = _detect_face(probe_img)
+    ref_emb = _extract_embedding(ref_img)
+    probe_emb = _extract_embedding(probe_img)
 
-    if ref_face is None:
+    if ref_emb is None:
         return {"match": False, "confidence": 0, "details": "No face detected in reference image",
-                "face_detected_ref": False, "face_detected_probe": probe_face is not None}
-    if probe_face is None:
+                "face_detected_ref": False, "face_detected_probe": probe_emb is not None}
+    if probe_emb is None:
         return {"match": False, "confidence": 0, "details": "No face detected in probe image",
                 "face_detected_ref": True, "face_detected_probe": False}
 
-    # ── Multi-metric comparison ───────────────────────────────────────────────
+    # Compare embeddings using Cosine Similarity
+    _, recognizer = _get_dnn_models()
+    score = recognizer.match(ref_emb, probe_emb, cv2.FaceRecognizerSF_FR_COSINE)
+    
+    # Official OpenCV SFace Threshold for Cosine is >= 0.363 for same person
+    # Scale score to 0..100 percentage. Make 0.363 equal to 60%.
+    if score < 0.363:
+        confidence = float(max(0, (score / 0.363) * 60))
+    else:
+        confidence = float(min(100, 60 + ((score - 0.363) / (1.0 - 0.363)) * 40))
 
-    # 1. Histogram correlation (color distribution similarity)
-    scores = []
-    for channel in range(3):
-        hist_ref = cv2.calcHist([ref_face], [channel], None, [64], [0, 256])
-        hist_probe = cv2.calcHist([probe_face], [channel], None, [64], [0, 256])
-        cv2.normalize(hist_ref, hist_ref)
-        cv2.normalize(hist_probe, hist_probe)
-        corr = cv2.compareHist(hist_ref, hist_probe, cv2.HISTCMP_CORREL)
-        scores.append(corr)
-    hist_score = sum(scores) / len(scores)  # -1 to 1, 1 = perfect
-
-    # 2. Structural similarity via normalized cross-correlation
-    ref_gray = cv2.cvtColor(ref_face, cv2.COLOR_BGR2GRAY)
-    probe_gray = cv2.cvtColor(probe_face, cv2.COLOR_BGR2GRAY)
-    ncc = cv2.matchTemplate(ref_gray, probe_gray, cv2.TM_CCORR_NORMED)[0][0]
-
-    # 3. Edge structure comparison (Canny edges → histogram correlation)
-    ref_edges = cv2.Canny(ref_gray, 50, 150)
-    probe_edges = cv2.Canny(probe_gray, 50, 150)
-    hist_ref_e = cv2.calcHist([ref_edges], [0], None, [32], [0, 256])
-    hist_probe_e = cv2.calcHist([probe_edges], [0], None, [32], [0, 256])
-    cv2.normalize(hist_ref_e, hist_ref_e)
-    cv2.normalize(hist_probe_e, hist_probe_e)
-    edge_score = cv2.compareHist(hist_ref_e, hist_probe_e, cv2.HISTCMP_CORREL)
-
-    # ── Weighted confidence ───────────────────────────────────────────────────
-    # Map to 0-100 scale
-    hist_pct = max(0, (hist_score + 1) / 2) * 100     # -1..1 → 0..100
-    ncc_pct = max(0, ncc) * 100                        # 0..1 → 0..100
-    edge_pct = max(0, (edge_score + 1) / 2) * 100      # -1..1 → 0..100
-
-    confidence = 0.45 * hist_pct + 0.35 * ncc_pct + 0.20 * edge_pct
-    confidence = round(min(100, max(0, confidence)), 1)
-
-    match = confidence >= 55.0
+    confidence = float(round(confidence, 1))
+    match = bool(score >= 0.363)
 
     return {
         "match": match,
         "confidence": confidence,
-        "details": (
-            f"Face match {'confirmed' if match else 'failed'} "
-            f"(histogram={hist_pct:.0f}%, structure={ncc_pct:.0f}%, edges={edge_pct:.0f}%)"
-        ),
+        "details": f"Face match {'confirmed' if match else 'failed'} via SFace DNN Module",
         "face_detected_ref": True,
         "face_detected_probe": True,
         "breakdown": {
-            "histogram_score": round(hist_pct, 1),
-            "structural_score": round(ncc_pct, 1),
-            "edge_score": round(edge_pct, 1),
+            "cosine_similarity": float(round(score, 3)),
+            "sface_threshold_required": 0.363
         },
     }
