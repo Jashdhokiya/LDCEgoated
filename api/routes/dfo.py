@@ -93,76 +93,22 @@ async def list_investigations(
     limit: int = 50,
     user: dict = Depends(require_role("DFO", "SCHEME_VERIFIER", "AUDIT")),
 ):
+    """Flags scoped to the officer's district."""
     district = user.get("district")
-    # Try dedicated investigations collection first
-    col = _col("investigations")
-    if col is not None:
-        query: dict = {}
-        if status:
-            query["status"] = status
-        if district:
-            query["district"] = district
-        if leakage_type:
-            query["leakage_type"] = leakage_type
-        try:
-            docs = list(col.find(query, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
-            if docs:
-                return {"total": col.count_documents(query), "cases": docs}
-        except Exception:
-            pass
+    col = _col("flags")
 
-    # Fall back to flags collection (from run-analysis)
-    flags_col = _col("flags")
-    flags: list = []
-    if flags_col is not None:
-        fquery: dict = {}
-        if status:
-            fquery["status"] = status
-        if district:
-            fquery["district"] = district
-        if leakage_type:
-            fquery["leakage_type"] = leakage_type
-        try:
-            flags = list(flags_col.find(fquery, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
-        except Exception:
-            pass
+    # ALWAYS filter by district
+    query: dict = {}
+    if district:
+        query["district"] = district
+    if status:
+        query["status"] = status
+    if leakage_type:
+        query["leakage_type"] = leakage_type
 
-    # Fall back to in-memory flag store from analysis.py
-    if not flags:
-        try:
-            from .analysis import _flag_store
-            all_flags = sorted(_flag_store.values(), key=lambda x: x.get("risk_score", 0), reverse=True)
-            # Apply filters
-            if status:
-                all_flags = [f for f in all_flags if f.get("status") == status]
-            if district:
-                all_flags = [f for f in all_flags if f.get("district") == district]
-            if leakage_type:
-                all_flags = [f for f in all_flags if f.get("leakage_type") == leakage_type]
-            flags = all_flags[skip:skip + limit]
-        except Exception:
-            pass
-
-    # Normalize flags into investigation-compatible shape
-    cases = []
-    for f in flags:
-        cases.append({
-            "case_id":          f.get("flag_id"),
-            "flag_id":          f.get("flag_id"),
-            "beneficiary_name": f.get("beneficiary_name"),
-            "beneficiary_id":  f.get("beneficiary_id"),
-            "district":         f.get("district"),
-            "scheme":           f.get("scheme"),
-            "leakage_type":     f.get("leakage_type"),
-            "payment_amount":   f.get("payment_amount", 0),
-            "risk_score":       f.get("risk_score", 0),
-            "risk_label":       f.get("risk_label"),
-            "status":           f.get("status", "OPEN"),
-            "evidence":         f.get("evidence"),
-            "recommended_action": f.get("recommended_action"),
-        })
-
-    return {"total": len(cases), "cases": cases}
+    docs = list(col.find(query, {"_id": 0}).sort("risk_score", -1).skip(skip).limit(limit))
+    total = col.count_documents(query)
+    return {"total": total, "cases": docs}
 
 
 @router.get("/investigations/{case_id}")

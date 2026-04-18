@@ -1,9 +1,9 @@
 """
 api/routes/verifier.py
-Scheme Verifier-only endpoints.
-GET  /api/verifier/my-cases                   — cases assigned to this verifier
-GET  /api/verifier/case/{case_id}             — single case detail
-POST /api/verifier/evidence/{case_id}         — submit GPS-tagged photo evidence
+Scheme Verifier-only endpoints — district-scoped.
+GET  /api/verifier/my-cases              — cases assigned to this verifier
+GET  /api/verifier/case/{case_id}        — single case detail
+POST /api/verifier/evidence/{case_id}    — submit GPS-tagged photo evidence
 """
 from datetime import datetime
 from typing import Optional
@@ -27,16 +27,9 @@ def _get_db():
 
 def _col(name: str):
     db = _get_db()
-    return db[name] if db is not None else None
-
-
-def _get_flags_from_memory():
-    """Get flags from the in-memory store in analysis.py."""
-    try:
-        from .analysis import _flag_store
-        return _flag_store
-    except Exception:
-        return {}
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    return db[name]
 
 
 def _normalize_for_verifier(flag: dict) -> dict:
@@ -49,7 +42,7 @@ def _normalize_for_verifier(flag: dict) -> dict:
         "district":         flag.get("district"),
         "scheme":           flag.get("scheme"),
         "leakage_type":     flag.get("leakage_type"),
-        "anomaly_type":     flag.get("leakage_type"),   # alias for frontend compat
+        "anomaly_type":     flag.get("leakage_type"),  # alias for frontend compat
         "payment_amount":   flag.get("payment_amount", 0),
         "amount":           flag.get("payment_amount", 0),  # alias
         "risk_score":       flag.get("risk_score", 0),
@@ -80,75 +73,29 @@ class EvidenceSubmission(BaseModel):
     confidence_score:   Optional[float]     = None
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _find_case(case_id: str, verifier_id: str):
-    """Finds a case in mongo (investigations or flags) assigned to this verifier."""
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                doc = col.find_one(
-                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}],
-                     "assigned_verifier_id": verifier_id},
-                    {"_id": 0}
-                )
-                if doc:
-                    return doc, cname
-            except Exception:
-                pass
-    return None, None
-
-
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/my-cases")
 async def my_cases(user: dict = Depends(require_role("SCHEME_VERIFIER"))):
-    """Return all cases assigned to the currently authenticated verifier."""
+    """Return all cases assigned to the currently authenticated verifier.
+    Filtered by the verifier's district for safety."""
     verifier_id = user["sub"]
-    all_cases: list = []
+    district = user.get("district")
 
-    # 1. Try MongoDB collections
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                docs = list(col.find(
-                    {"assigned_verifier_id": verifier_id},
-                    {"_id": 0}
-                ).sort("risk_score", -1))
-                all_cases.extend(docs)
-            except Exception:
-                pass
+    col = _col("flags")
 
-    # 2. Fall back to in-memory flag store — cases assigned to this verifier
-    if not all_cases:
-        flag_store = _get_flags_from_memory()
-        for fid, f in flag_store.items():
-            if f.get("assigned_verifier_id") == verifier_id:
-                all_cases.append(f)
+    # Query: assigned to this verifier AND in this district
+    query = {"assigned_verifier_id": verifier_id}
+    if district:
+        query["district"] = district
 
-    # 3. If still empty, provide demo cases: assign top high-risk flags to this verifier
-    if not all_cases:
-        flag_store = _get_flags_from_memory()
-        all_flags = sorted(flag_store.values(), key=lambda x: x.get("risk_score", 0), reverse=True)
-        demo_cases = []
-        for f in all_flags:
-            if f.get("status") in ("OPEN", "ASSIGNED"):
-                # Temporarily mark as assigned to this verifier for demo
-                demo = dict(f)
-                demo["assigned_verifier_id"] = verifier_id
-                demo["status"] = "ASSIGNED_TO_VERIFIER"
-                demo_cases.append(demo)
-                if len(demo_cases) >= 5:
-                    break
-        all_cases = demo_cases
+    docs = list(col.find(query, {"_id": 0}).sort("risk_score", -1))
 
-    # De-duplicate by case_id / flag_id
-    seen: set = set()
-    unique: list = []
-    for c in all_cases:
-        key = c.get("case_id") or c.get("flag_id", "")
+    # De-duplicate by flag_id
+    seen = set()
+    unique = []
+    for c in docs:
+        key = c.get("flag_id") or c.get("case_id", "")
         if key not in seen:
             seen.add(key)
             unique.append(_normalize_for_verifier(c))
@@ -156,6 +103,7 @@ async def my_cases(user: dict = Depends(require_role("SCHEME_VERIFIER"))):
     return {
         "verifier_id": verifier_id,
         "name":        user.get("name"),
+        "district":    district,
         "total":       len(unique),
         "pending":     sum(1 for c in unique if c.get("status") == "ASSIGNED_TO_VERIFIER"),
         "submitted":   sum(1 for c in unique if c.get("status") == "VERIFICATION_SUBMITTED"),
@@ -165,15 +113,15 @@ async def my_cases(user: dict = Depends(require_role("SCHEME_VERIFIER"))):
 
 @router.get("/case/{case_id}")
 async def get_case(case_id: str, user: dict = Depends(require_role("SCHEME_VERIFIER"))):
-    # Try MongoDB
-    doc, _ = _find_case(case_id, user["sub"])
-    if doc:
-        return _normalize_for_verifier(doc)
-    # Try in-memory
-    flag_store = _get_flags_from_memory()
-    if case_id in flag_store:
-        return _normalize_for_verifier(flag_store[case_id])
-    raise HTTPException(404, f"Case {case_id} not found or not assigned to you")
+    col = _col("flags")
+    doc = col.find_one(
+        {"$or": [{"case_id": case_id}, {"flag_id": case_id}],
+         "assigned_verifier_id": user["sub"]},
+        {"_id": 0}
+    )
+    if not doc:
+        raise HTTPException(404, f"Case {case_id} not found or not assigned to you")
+    return _normalize_for_verifier(doc)
 
 
 @router.post("/evidence/{case_id}")
@@ -183,10 +131,13 @@ async def submit_evidence(
     user: dict = Depends(require_role("SCHEME_VERIFIER")),
 ):
     """Submit GPS-tagged field evidence for a case."""
-    doc, collection_name = _find_case(case_id, user["sub"])
-    if not doc:
-        # Still allow submission even if not explicitly assigned (for demo)
-        collection_name = "flags"
+    col = _col("flags")
+
+    # Verify case exists (don't require assignment for flexibility)
+    doc = col.find_one(
+        {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
+        {"_id": 0}
+    )
 
     field_report = {
         "photo_evidence_url":    body.photo_evidence_url,
@@ -214,26 +165,12 @@ async def submit_evidence(
         "field_report": field_report,
     }
 
-    # Update MongoDB
-    for cname in ["investigations", "flags"]:
-        col = _col(cname)
-        if col is not None:
-            try:
-                col.update_one(
-                    {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
-                    {"$set": update}
-                )
-            except Exception:
-                pass
-
-    # Also update in-memory flag store so audit/DFO see the submission
-    try:
-        from .analysis import _flag_store
-        if case_id in _flag_store:
-            _flag_store[case_id]["status"] = "VERIFICATION_SUBMITTED"
-            _flag_store[case_id]["field_report"] = field_report
-    except Exception:
-        pass
+    # Update in MongoDB flags collection
+    result = col.update_one(
+        {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
+        {"$set": update}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(404, f"Case {case_id} not found in database")
 
     return {"case_id": case_id, "status": "VERIFICATION_SUBMITTED", "field_report": field_report}
-
