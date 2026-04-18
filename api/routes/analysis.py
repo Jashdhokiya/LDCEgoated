@@ -1,12 +1,15 @@
 """
 api/routes/analysis.py
-Core detection-engine routes — protected to DFO role.
-POST /api/run-analysis
-GET  /api/flags
-GET  /api/flag/{flag_id}
-PATCH /api/flag/{flag_id}/status
-GET  /api/stats
-GET  /api/report
+Core detection-engine routes.
+POST /api/run-analysis       — run all 4 detectors, write flags to MongoDB
+GET  /api/flags              — flags (district-scoped for DFO)
+GET  /api/flag/{flag_id}     — single flag
+PATCH /api/flag/{flag_id}/status — update flag status
+GET  /api/stats              — aggregated stats (district-scoped for DFO)
+GET  /api/report             — text audit report (district-scoped for DFO)
+
+DFO/AUDIT/VERIFIER see only their district's data.
+STATE_ADMIN sees everything.
 """
 import time
 import uuid
@@ -17,14 +20,10 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import PlainTextResponse
 
-from ..deps import require_role, get_current_user
+from ..deps import require_role
 
 router = APIRouter(tags=["analysis"])
 
-# ── In-memory flag store (populated after run-analysis) ────────────────────
-_flag_store: dict = {}
-
-# ── Lazy imports to avoid circular deps ─────────────────────────────────────
 
 def _load_detectors():
     from detectors.cross_scheme_detector import detect_cross_scheme
@@ -47,25 +46,41 @@ def _get_db():
 
 def _col(name: str):
     db = _get_db()
-    return db[name] if db is not None else None
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    return db[name]
+
+
+def _district_query(user: dict) -> dict:
+    """
+    Returns a MongoDB query filter scoped to the officer's district.
+    STATE_ADMIN gets {} (all data). Everyone else gets {"district": <their district>}.
+    """
+    role = user.get("role", "")
+    if role == "STATE_ADMIN":
+        return {}
+    district = user.get("district")
+    if district:
+        return {"district": district}
+    return {}
 
 
 def _fallback_evidence(flag: dict) -> str:
     lt = flag.get("leakage_type", "")
     ed = flag.get("evidence_data") or {}
     if lt == "DECEASED":
-        return (f"Student received ₹{flag.get('payment_amount',0):,} under {flag.get('scheme')} "
+        return (f"Student received Rs.{flag.get('payment_amount',0):,} under {flag.get('scheme')} "
                 f"on {flag.get('payment_date')}. Death registry: {ed.get('death_date')}. "
                 f"Payment {ed.get('days_post_mortem')} days post-mortem.")
     if lt == "DUPLICATE":
         return (f"Duplicate identity. Primary: {ed.get('primary_name')} "
                 f"({ed.get('primary_district')}). Method: {ed.get('match_method')}.")
     if lt == "UNDRAWN":
-        return (f"₹{flag.get('payment_amount',0):,} credited {flag.get('payment_date')} — "
+        return (f"Rs.{flag.get('payment_amount',0):,} credited {flag.get('payment_date')} - "
                 f"undrawn for {ed.get('days_pending')} days (threshold: {ed.get('threshold_days')}).")
     if lt == "CROSS_SCHEME":
-        return (f"Drawing {ed.get('scheme_a')} (₹{ed.get('amount_a',0):,}) and "
-                f"{ed.get('scheme_b')} (₹{ed.get('amount_b',0):,}) simultaneously.")
+        return (f"Drawing {ed.get('scheme_a')} (Rs.{ed.get('amount_a',0):,}) and "
+                f"{ed.get('scheme_b')} (Rs.{ed.get('amount_b',0):,}) simultaneously.")
     return "Anomaly detected. Manual review required."
 
 
@@ -73,13 +88,19 @@ def _fallback_evidence(flag: dict) -> str:
 
 @router.post("/api/run-analysis")
 async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STATE_ADMIN"))):
-    global _flag_store
     start = time.time()
 
     try:
         detect_deceased, detect_duplicates, detect_undrawn, detect_cross_scheme, compute_risk_score, load_all = _load_detectors()
     except ImportError as e:
         raise HTTPException(500, f"Detector import failed: {e}")
+
+    # Clear data loader cache so detectors re-read from MongoDB
+    try:
+        from detectors.data_loader import clear_cache
+        clear_cache()
+    except Exception:
+        pass
 
     try:
         from ai_layer.evidence_generator import generate_evidence
@@ -104,29 +125,31 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
                           "evidence": evidence, "recommended_action": action, "status": "OPEN"})
 
     enriched.sort(key=lambda x: x["risk_score"], reverse=True)
-    _flag_store.clear()
     for idx, flag in enumerate(enriched, start=1):
-        fid = f"F-{idx:04d}"
-        flag["flag_id"] = fid
-        _flag_store[fid] = flag
+        flag["flag_id"] = f"F-{idx:04d}"
 
+    # Write all flags to MongoDB
     col = _col("flags")
-    if col is not None:
-        try:
-            col.delete_many({})
-            if enriched:
-                col.insert_many([{k: v for k, v in f.items() if k != "_id"} for f in enriched])
-        except Exception as e:
-            print(f"  [analysis] MongoDB write error: {e}")
+    col.delete_many({})
+    if enriched:
+        col.insert_many([{k: v for k, v in f.items() if k != "_id"} for f in enriched])
 
     elapsed = time.time() - start
+
+    # Return only district-scoped flags to the requesting officer
+    dq = _district_query(user)
+    if dq:
+        scoped = [f for f in enriched if f.get("district") == dq.get("district")]
+    else:
+        scoped = enriched
+
     data = load_all()
     return {
         "run_id":                   body.get("run_id", str(uuid.uuid4())),
         "total_transactions":       len(data.get("payments", [])),
-        "flagged_count":            len(enriched),
+        "flagged_count":            len(scoped),
         "processing_time_seconds":  round(elapsed, 2),
-        "flags":                    enriched,
+        "flags":                    scoped,
         "run_by":                   user.get("name"),
     }
 
@@ -134,63 +157,41 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
 @router.get("/api/flags")
 async def get_flags(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUDIT"))):
     col = _col("flags")
-    if col is not None:
-        try:
-            docs = list(col.find({}, {"_id": 0}).sort("risk_score", -1))
-            if docs:
-                return docs
-        except Exception:
-            pass
-    return sorted(_flag_store.values(), key=lambda x: x.get("risk_score", 0), reverse=True)
+    query = _district_query(user)
+    docs = list(col.find(query, {"_id": 0}).sort("risk_score", -1))
+    return docs
 
 
 @router.get("/api/flag/{flag_id}")
 async def get_flag(flag_id: str, user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUDIT"))):
     col = _col("flags")
-    if col is not None:
-        try:
-            doc = col.find_one({"flag_id": flag_id}, {"_id": 0})
-            if doc:
-                return doc
-        except Exception:
-            pass
-    if flag_id not in _flag_store:
+    doc = col.find_one({"flag_id": flag_id}, {"_id": 0})
+    if not doc:
         raise HTTPException(404, "Flag not found")
-    return _flag_store[flag_id]
+    return doc
 
 
 @router.patch("/api/flag/{flag_id}/status")
 async def update_flag_status(flag_id: str, body: dict,
                               user: dict = Depends(require_role("DFO", "AUDIT"))):
-    valid = {"OPEN", "ASSIGNED", "RESOLVED"}
+    valid = {"OPEN", "ASSIGNED", "ASSIGNED_TO_VERIFIER", "VERIFICATION_SUBMITTED", "AUDIT_REVIEW", "RESOLVED"}
     new_status = body.get("status")
     if new_status not in valid:
         raise HTTPException(400, f"Status must be one of {valid}")
 
     col = _col("flags")
-    if col is not None:
-        try:
-            col.update_one({"flag_id": flag_id}, {"$set": {"status": new_status}})
-        except Exception:
-            pass
-
-    if flag_id in _flag_store:
-        _flag_store[flag_id]["status"] = new_status
-        return _flag_store[flag_id]
-    return {"flag_id": flag_id, "status": new_status}
+    result = col.update_one({"flag_id": flag_id}, {"$set": {"status": new_status}})
+    if result.matched_count == 0:
+        raise HTTPException(404, f"Flag {flag_id} not found")
+    doc = col.find_one({"flag_id": flag_id}, {"_id": 0})
+    return doc
 
 
 @router.get("/api/stats")
 async def get_stats(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUDIT"))):
-    flags = []
     col = _col("flags")
-    if col is not None:
-        try:
-            flags = list(col.find({}, {"_id": 0}))
-        except Exception:
-            pass
-    if not flags:
-        flags = list(_flag_store.values())
+    query = _district_query(user)
+    flags = list(col.find(query, {"_id": 0}))
 
     by_type = defaultdict(int)
     by_district = defaultdict(int)
@@ -215,15 +216,11 @@ async def get_stats(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUD
 
 @router.get("/api/report", response_class=PlainTextResponse)
 async def get_report(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUDIT"))):
-    flags = []
     col = _col("flags")
-    if col is not None:
-        try:
-            flags = list(col.find({}, {"_id": 0}))
-        except Exception:
-            pass
-    if not flags:
-        flags = list(_flag_store.values())
+    query = _district_query(user)
+    flags = list(col.find(query, {"_id": 0}))
+
+    district = user.get("district", "All Districts")
 
     try:
         from ai_layer.report_generator import generate_report
@@ -237,11 +234,12 @@ async def get_report(user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AU
         by_type[f.get("leakage_type", "?")] += 1
     lines = [
         "EDUGUARD DBT AUDIT REPORT",
+        f"District: {district}",
         f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
         f"Generated by: {user.get('name')} ({user.get('role')})",
         "=" * 50,
         f"Total Flags: {len(flags)}",
-        f"Total Amount at Risk: ₹{total:,}",
+        f"Total Amount at Risk: Rs.{total:,}",
         "",
         "BREAKDOWN BY LEAKAGE TYPE:",
     ]

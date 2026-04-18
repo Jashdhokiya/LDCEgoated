@@ -65,7 +65,7 @@ const ACTIVE_CLASS = {
   USER:            'border-gray-400 text-white',
 }
 
-export default function Sidebar({ role, onLogout }) {
+export default function Sidebar({ role, officer, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useLanguage()
@@ -73,6 +73,11 @@ export default function Sidebar({ role, onLogout }) {
   const accentDot   = ROLE_ACCENT[role]  || 'bg-blue-500'
   const sidebarBg   = SIDEBAR_BG[role]   || 'bg-shell'
   const activeClass = ACTIVE_CLASS[role]  || 'border-blue-400 text-white'
+
+  // Build the role badge label dynamically from officer data
+  const district = officer?.district
+  const roleName = t(`roles.${role}`) || role
+  const badgeLabel = district ? `${roleName} — ${district}` : roleName
 
   return (
     <aside className={`w-64 ${sidebarBg} text-text-inverse flex flex-col shadow-2xl z-10 relative`}>
@@ -87,10 +92,15 @@ export default function Sidebar({ role, onLogout }) {
         </p>
       </div>
 
-      {/* Role badge */}
-      <div className="mx-5 mt-2 mb-4 px-3 py-2 bg-surface-lowest/5 border border-white/10 rounded-md flex items-center gap-2">
-        <div className={`w-2 h-2 rounded-full ${accentDot} flex-shrink-0`} />
-        <span className="text-xs text-white/90 font-mono truncate">{t(`roles.${role}`) || role}</span>
+      {/* Role badge — shows actual officer name + district */}
+      <div className="mx-5 mt-2 mb-4 px-3 py-2 bg-surface-lowest/5 border border-white/10 rounded-md">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${accentDot} flex-shrink-0`} />
+          <span className="text-xs text-white/90 font-mono truncate">{badgeLabel}</span>
+        </div>
+        {officer?.name && (
+          <p className="text-[10px] text-white/50 font-data mt-1 ml-4 truncate">{officer.name}</p>
+        )}
       </div>
 
       {/* Navigation */}

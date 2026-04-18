@@ -59,7 +59,7 @@ export default function FlaggedInstitutions() {
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-surface-low text-text-secondary">{inst.type.replace('_', ' ')}</span>
                   </div>
                   <h3 className="text-lg font-bold text-text-primary font-sans">{inst.name}</h3>
-                  <p className="text-sm text-text-secondary font-data mt-0.5">{inst.taluka}, Ahmedabad · {inst.beneficiary_count} beneficiaries</p>
+                  <p className="text-sm text-text-secondary font-data mt-0.5">{inst.taluka}, {inst.district || 'Unknown'} · {inst.beneficiary_count} beneficiaries</p>
 
                   {/* Flag reason */}
                   <div className="flex items-start gap-2 mt-3 bg-tint-red border border-border-subtle rounded-lg px-3 py-2">

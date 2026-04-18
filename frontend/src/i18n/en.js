@@ -58,7 +58,7 @@ const en = {
 
   // ── Role Labels ──
   roles: {
-    DFO: 'DFO — Ahmedabad',
+    DFO: 'District Fraud Officer',
     STATE_ADMIN: 'State Admin — Gujarat',
     AUDIT_OFFICER: 'Audit Officer',
     SCHEME_VERIFIER: 'Scheme Verifier',
@@ -223,7 +223,7 @@ const en = {
   // ── Middlemen Registry ──
   middlemen: {
     title: 'Middlemen Registry',
-    subtitle: 'All institutions (schools, colleges, gram panchayats) under Ahmedabad District',
+    subtitle: 'All institutions (schools, colleges, gram panchayats) under your district',
     loadingInst: 'Loading institutions…',
     noInstitutions: 'No institutions loaded',
     noInstSub: 'Backend may be starting up. Try again.',
@@ -246,7 +246,7 @@ const en = {
   // ── Flagged Institutions ──
   flaggedInst: {
     title: 'Flagged Institutions',
-    subtitle: 'institutions with active risk flags in Ahmedabad District',
+    subtitle: 'Institutions with active risk flags in your district',
     riskScore: 'Risk Score',
     assignToVerifier: 'Assign to Verifier',
     referToAudit: 'Refer to Audit Team',
