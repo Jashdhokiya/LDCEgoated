@@ -154,20 +154,27 @@ async def complete_profile(
     if not existing:
         raise HTTPException(404, "User not found")
 
-    # Validate face photo if provided
+    # Validate face photo (now mandatory)
+    if not body.face_photo:
+        raise HTTPException(status_code=400, detail="Face photo is mandatory for identity verification.")
+
     face_enrolled = False
-    if body.face_photo:
-        try:
-            from ..face_verify import detect_face_in_image
-            result = detect_face_in_image(body.face_photo)
-            if not result["face_detected"]:
-                raise HTTPException(400, "No face detected in the photo. Please take a clear selfie.")
-            face_enrolled = True
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.warning(f"Face detection check failed (non-critical): {e}")
-            face_enrolled = True  # Allow enrollment even if OpenCV fails
+    secure_url = body.face_photo
+    try:
+        from ..face_verify import detect_face_in_image, upload_face
+        result = detect_face_in_image(body.face_photo)
+        if not result["face_detected"]:
+            raise HTTPException(400, "No face detected in the photo. Please take a clear selfie.")
+        
+        # Upload to Cloudinary if available
+        secure_url = upload_face(body.face_photo)
+        face_enrolled = True
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Face detection or upload failed (non-critical): {e}")
+        # Allow enrollment even if pipeline fails, to unblock
+        face_enrolled = True
 
     update = {
         "phone":          body.phone.strip(),
@@ -186,10 +193,17 @@ async def complete_profile(
         "profile_completed_at": datetime.utcnow().isoformat(),
     }
 
-    if body.face_photo:
-        update["face_reference"] = body.face_photo
-        update["face_enrolled"] = True
-        update["face_enrolled_at"] = datetime.utcnow().isoformat()
+    # Upload to Cloudinary
+    try:
+        from ..face_verify import upload_face
+        secure_url = upload_face(body.face_photo)
+    except Exception as e:
+        logger.warning(f"Upload face failed: {e}")
+        secure_url = body.face_photo
+
+    update["face_reference"] = secure_url
+    update["face_enrolled"] = True
+    update["face_enrolled_at"] = datetime.utcnow().isoformat()
 
     col.update_one({"user_id": uid}, {"$set": update})
     updated = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0, "face_reference": 0})
@@ -341,10 +355,17 @@ async def upload_face_reference(
     except Exception as e:
         logger.warning(f"Face detection failed (non-critical): {e}")
 
+    try:
+        from ..face_verify import upload_face
+        secure_url = upload_face(body.face_photo)
+    except Exception as e:
+        logger.warning(f"Upload face failed: {e}")
+        secure_url = body.face_photo
+
     col.update_one(
         {"user_id": uid},
         {"$set": {
-            "face_reference": body.face_photo,
+            "face_reference": secure_url,
             "face_enrolled": True,
             "face_enrolled_at": datetime.utcnow().isoformat(),
         }}

@@ -17,12 +17,36 @@ production would use a proper embedding model (ArcFace, FaceNet, etc.).
 import base64
 import io
 import logging
+import os
+import urllib.request
 from typing import Optional, Tuple
 
 import cv2
 import numpy as np
 
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
 logger = logging.getLogger(__name__)
+
+# ── Cloudinary Configuration ──────────────────────────────────────────────
+CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
+CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY", "")
+CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET", "")
+
+CLOUDINARY_ENABLED = bool(CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET)
+
+if CLOUDINARY_ENABLED:
+    cloudinary.config(
+        cloud_name=CLOUDINARY_CLOUD_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET,
+        secure=True
+    )
+    logger.info("[face_verify] Cloudinary configured for face image storage.")
+else:
+    logger.warning("[face_verify] Cloudinary not configured. Falling back to MongoDB base64 storage.")
 
 # Load Haar cascade for frontal face detection
 _FACE_CASCADE = None
@@ -36,18 +60,51 @@ def _get_cascade():
     return _FACE_CASCADE
 
 
-def _b64_to_cv2(b64_string: str) -> Optional[np.ndarray]:
-    """Decode a base64 image string to an OpenCV BGR image."""
+def upload_face(b64_string: str) -> str:
+    """
+    Upload a base64 image to Cloudinary and return the secure URL.
+    If Cloudinary is not configured or fails, returns the original base64.
+    """
+    if not CLOUDINARY_ENABLED:
+        return b64_string
+
     try:
-        # Strip data URL prefix if present
-        if "," in b64_string:
-            b64_string = b64_string.split(",", 1)[1]
-        img_bytes = base64.b64decode(b64_string)
+        # Cloudinary uploader handles base64 natively
+        if not b64_string.startswith("data:"):
+            b64_string = f"data:image/jpeg;base64,{b64_string}"
+
+        response = cloudinary.uploader.upload(
+            b64_string,
+            folder="eduguard_faces",
+            resource_type="image"
+        )
+        url = response.get("secure_url")
+        logger.info(f"[face_verify] Uploaded face to Cloudinary: {url}")
+        return url or b64_string
+    except Exception as e:
+        logger.error(f"[face_verify] Cloudinary upload failed: {e}")
+        return b64_string
+
+
+def _b64_to_cv2(image_data: str) -> Optional[np.ndarray]:
+    """Decode a base64 image string OR download from a URL to an OpenCV BGR image."""
+    try:
+        if image_data.startswith("http://") or image_data.startswith("https://"):
+            # It's a URL
+            req = urllib.request.urlopen(image_data)
+            arr = np.asarray(bytearray(req.read()), dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+            return img
+
+        # Strip data URL prefix if present for base64
+        if "," in image_data:
+            image_data = image_data.split(",", 1)[1]
+        img_bytes = base64.b64decode(image_data)
         nparr = np.frombuffer(img_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         return img
     except Exception as e:
-        logger.error(f"Failed to decode base64 image: {e}")
+        logger.error(f"Failed to decode image data: {e}")
         return None
 
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, MapPin, CreditCard, X, Loader2, Check, XCircle } from 'lucide-react'
-import { getUser, faceVerifyKYC, completeKYC } from '../../api'
+import { getUser, faceVerifyKYC, completeKYC, uploadFaceReference } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 import WebcamCapture from '../../components/WebcamCapture'
 
@@ -44,23 +44,20 @@ function KYCModal({ user, onClose, onComplete }) {
   const handleFaceCapture = async (base64) => {
     setVerifying(true)
     try {
-      const res = await faceVerifyKYC(base64)
-      setVerifyResult(res)
+      if (!hasFaceRef) {
+        // Enrolling for the first time
+        await uploadFaceReference(base64)
+        // Immediately do basic KYC to finish the process since they just enrolled
+        await completeKYC()
+        setVerifyResult({ success: true, confidence: 100, details: 'Face enrolled successfully', message: 'Done' })
+      } else {
+        // Normal verification
+        const res = await faceVerifyKYC(base64)
+        setVerifyResult(res)
+      }
       setStep(3)
     } catch (err) {
       setVerifyResult({ success: false, confidence: 0, details: err?.response?.data?.detail || 'Verification failed', message: 'Error' })
-      setStep(3)
-    } finally { setVerifying(false) }
-  }
-
-  const handleBasicKYC = async () => {
-    setVerifying(true)
-    try {
-      await completeKYC()
-      setVerifyResult({ success: true, confidence: 100, details: 'Basic KYC completed', message: 'Done' })
-      setStep(3)
-    } catch (err) {
-      setVerifyResult({ success: false, confidence: 0, details: err?.response?.data?.detail || 'Failed', message: 'Error' })
       setStep(3)
     } finally { setVerifying(false) }
   }
@@ -110,24 +107,20 @@ function KYCModal({ user, onClose, onComplete }) {
                 </div>
               ))}
             </div>
-            <div className={`flex items-center gap-2 px-4 py-3 rounded-lg mb-4 ${hasFaceRef ? 'bg-tint-emerald' : 'bg-tint-yellow'}`}>
-              <Camera size={14} className={hasFaceRef ? 'text-emerald-600' : 'text-yellow-600'} />
-              <span className={`text-xs font-data font-bold ${hasFaceRef ? 'text-emerald-600' : 'text-yellow-600'}`}>
-                Face ID: {hasFaceRef ? 'Enrolled — face verification available' : 'Not enrolled — basic KYC only'}
+            <div className={`flex items-center gap-2 px-4 py-3 rounded-lg mb-4 ${hasFaceRef ? 'bg-tint-emerald' : 'bg-tint-red'}`}>
+              <Camera size={14} className={hasFaceRef ? 'text-emerald-600' : 'text-risk-critical'} />
+              <span className={`text-xs font-data font-bold ${hasFaceRef ? 'text-emerald-600' : 'text-risk-critical'}`}>
+                Face ID: {hasFaceRef ? 'Enrolled — face verification available' : 'Not enrolled — Face enrolment required to proceed'}
               </span>
             </div>
             <div className="flex gap-3">
               <button onClick={onClose} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-low transition-all">{t('common.cancel')}</button>
-              {hasFaceRef ? (
-                <button onClick={() => setStep(2)} className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2">
-                  <Camera size={14} /> Verify Face
-                </button>
-              ) : (
-                <button onClick={handleBasicKYC} disabled={verifying} className="flex-1 py-2.5 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60">
-                  {verifying ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                  {verifying ? 'Verifying…' : 'Complete Basic KYC'}
-                </button>
-              )}
+              <button 
+                onClick={() => setStep(2)} 
+                className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+              >
+                <Camera size={14} /> {hasFaceRef ? 'Verify Face' : 'Enroll Face ID'}
+              </button>
             </div>
           </div>
         )}
