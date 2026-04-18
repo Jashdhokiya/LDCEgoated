@@ -45,6 +45,7 @@ def _col(name: str):
 
 class ProfileCompletionRequest(BaseModel):
     phone: str
+    email: Optional[str] = None
     district: str
     taluka: str
     gender: str                    # M | F | OTHER
@@ -178,6 +179,7 @@ async def complete_profile(
 
     update = {
         "phone":          body.phone.strip(),
+        "email":          body.email.strip() if body.email else None,
         "district":       body.district.strip(),
         "taluka":         body.taluka.strip(),
         "gender":         body.gender.strip().upper(),
@@ -211,7 +213,7 @@ async def complete_profile(
     # Send profile completion email
     try:
         from ..email_service import send_profile_complete_email
-        email = existing.get("email") or existing.get("contact", {}).get("email", "")
+        email = body.email or existing.get("email") or existing.get("contact", {}).get("email", "")
         if email:
             send_profile_complete_email(email, existing.get("name", "User"), body.district)
     except Exception as e:

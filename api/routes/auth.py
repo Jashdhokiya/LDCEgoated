@@ -247,6 +247,18 @@ def register(body: UserRegisterRequest):
     }
     token = create_access_token(token_payload)
 
+    # Send welcome email if dummy email format used (or if we collect email later)
+    # Right now, since citizen registration does not collect email explicitly in the body,
+    # we'll assume there isn't one yet unless added later. But we add the call logic here.
+    try:
+        from ..email_service import send_welcome_email
+        email = body.name.replace(" ", "").lower() + "@example.com" # Placeholder if real email isn't available
+        send_welcome_email(email, body.name.strip(), user_id)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Welcome email failed: {e}")
+
     return {
         "access_token":   token,
         "token_type":     "bearer",

@@ -31,6 +31,7 @@ export default function CompleteProfile() {
   const [geography, setGeography] = useState([])
 
   // Form fields
+  const [email, setEmail]         = useState('')
   const [phone, setPhone]         = useState('')
   const [gender, setGender]       = useState('')
   const [dob, setDob]             = useState('')
@@ -50,6 +51,7 @@ export default function CompleteProfile() {
   const districtTalukas = geography.find(g => g.district === district)?.talukas || []
 
   const validateStep1 = () => {
+    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return 'Enter a valid email address'
     if (!phone || phone.length < 10) return 'Enter a valid 10-digit phone number'
     if (!gender) return 'Select your gender'
     if (!dob) return 'Enter your date of birth'
@@ -87,6 +89,7 @@ export default function CompleteProfile() {
     setError(''); setLoading(true)
     try {
       const data = await completeProfile({
+        email:                email.trim(),
         phone:                phone.trim(),
         district:             district,
         taluka:               taluka,
@@ -163,10 +166,17 @@ export default function CompleteProfile() {
               <h3 className="text-sm font-bold text-text-primary uppercase tracking-widest flex items-center gap-2">
                 <User size={16} /> Personal Information
               </h3>
-              <div>
-                <label className="block text-xs font-bold text-text-secondary mb-1">Phone Number</label>
-                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} maxLength={10}
-                  placeholder="10-digit mobile number" className={inputClass} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">Email Address</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    placeholder="yourname@gmail.com" className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text-secondary mb-1">Phone Number</label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} maxLength={10}
+                    placeholder="10-digit mobile number" className={inputClass} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
