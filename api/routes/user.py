@@ -66,14 +66,60 @@ async def get_profile(user: dict = Depends(require_role("USER"))):
         return {
             "user_id": uid,
             "name": user.get("name", "Citizen"),
+            "full_name": user.get("name", "Citizen"),
             "profile_complete": False,
             "kyc_complete": False,
+            "aadhaar_display": "XXXX-XXXX-XXXX",
+            "demographics": {"district": "", "taluka": "", "category": ""},
+            "bank": {"bank": "", "account_display": "", "ifsc": ""},
+            "registered_schemes": [],
+            "kyc_profile": {
+                "is_kyc_compliant": False, "days_remaining": 0,
+                "kyc_expiry_date": "", "last_kyc_date": "",
+                "dynamic_validity_days": 90,
+            },
         }
 
-    # Attach payment history
+    # Attach payment history as registered_schemes
     pay_col = _col("payment_ledger")
     payments = list(pay_col.find({"beneficiary_id": uid}, {"_id": 0}))
     doc["registered_schemes"] = payments
+
+    # ── Normalize for frontend (UserDashboard.jsx) ────────────────────────
+    doc["full_name"] = doc.get("name", user.get("name", "Citizen"))
+
+    # Aadhaar display: mask all but last 4
+    raw_aadhaar = doc.get("aadhaar_hash", "")
+    if len(raw_aadhaar) >= 4:
+        doc["aadhaar_display"] = "XXXX-XXXX-" + raw_aadhaar[-4:]
+    else:
+        doc["aadhaar_display"] = "XXXX-XXXX-XXXX"
+
+    # Demographics sub-object
+    doc["demographics"] = {
+        "district": doc.get("district", ""),
+        "taluka": doc.get("taluka", ""),
+        "category": doc.get("caste_category", ""),
+    }
+
+    # Bank sub-object (frontend expects bank.bank, backend stores bank.bank_name)
+    bank = doc.get("bank") or {}
+    doc["bank"] = {
+        "bank": bank.get("bank_name", bank.get("bank", "")),
+        "bank_name": bank.get("bank_name", ""),
+        "account_display": bank.get("account_display", ""),
+        "ifsc": bank.get("ifsc", ""),
+    }
+
+    # KYC profile defaults
+    if "kyc_profile" not in doc or not doc["kyc_profile"]:
+        doc["kyc_profile"] = {
+            "is_kyc_compliant": doc.get("kyc_complete", False),
+            "days_remaining": 90 if doc.get("kyc_complete") else 0,
+            "kyc_expiry_date": "",
+            "last_kyc_date": "",
+            "dynamic_validity_days": 90,
+        }
 
     return doc
 

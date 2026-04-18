@@ -25,6 +25,7 @@ import CompleteProfile from './pages/user/CompleteProfile'
 
 // Audit Officer
 import AuditOfficerDashboard from './pages/audit/AuditOfficerDashboard'
+import AuditVerifierQueue from './pages/audit/AuditVerifierQueue'
 
 // Scheme Verifier
 import SchemeVerifierDashboard from './pages/verifier/SchemeVerifierDashboard'
@@ -126,7 +127,7 @@ export default function App() {
         {/* Audit Officer */}
         <Route path="/audit/overview" element={<AuditOfficerDashboard />} />
         <Route path="/audit/report" element={<AuditReport />} />
-        <Route path="/audit/verifier-queue" element={<InvestigationQueue />} />
+        <Route path="/audit/verifier-queue" element={<AuditVerifierQueue />} />
 
         {/* Scheme Verifier */}
         <Route path="/verifier/my-cases" element={<SchemeVerifierDashboard />} />

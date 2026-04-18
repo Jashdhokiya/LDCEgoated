@@ -1,33 +1,38 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../../api'
+import { getInvestigations } from '../../api'
 import { RiskBadge, LeakageBadge } from '../../components/RiskBadge'
 import { useLanguage } from '../../i18n/LanguageContext'
 
+const STATUS_TABS = [
+  { key: null,            label: 'All Cases' },
+  { key: 'OPEN',          label: 'Open' },
+  { key: 'ASSIGNED',      label: 'Assigned' },
+  { key: 'ASSIGNED_TO_VERIFIER', label: 'With Verifier' },
+  { key: 'VERIFICATION_SUBMITTED', label: 'Evidence Submitted' },
+  { key: 'AUDIT_REVIEW',  label: 'Audit Reviewed' },
+  { key: 'RESOLVED',      label: 'Resolved' },
+]
+
 export default function InvestigationQueue() {
   const { t } = useLanguage()
-  const [flags, setFlags] = useState([])
+  const [cases, setCases] = useState([])
+  const [activeTab, setActiveTab] = useState(null)
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.getFlags().then(res => {
-      setFlags(res.data)
+    setLoading(true)
+    const params = activeTab ? { status: activeTab } : {}
+    getInvestigations(params).then(res => {
+      const list = res?.cases || (Array.isArray(res) ? res : [])
+      setCases(list)
       setLoading(false)
     }).catch(e => {
       console.error(e)
       setLoading(false)
     })
-  }, [])
-
-  const handleStatusChange = async (flagId, newStatus) => {
-    try {
-      await api.updateFlagStatus(flagId, newStatus)
-      setFlags(flags.map(f => f.flag_id === flagId ? { ...f, status: newStatus } : f))
-    } catch (e) {
-      console.error(e)
-    }
-  }
+  }, [activeTab])
 
   const getRiskColor = (label) => {
     if (label === 'CRITICAL') return 'bg-risk-critical'
@@ -36,9 +41,42 @@ export default function InvestigationQueue() {
     return 'bg-risk-low'
   }
 
+  const getStatusBadge = (status) => {
+    const styles = {
+      OPEN: 'bg-tint-blue text-primary-override',
+      ASSIGNED: 'bg-tint-orange text-orange-700',
+      ASSIGNED_TO_VERIFIER: 'bg-tint-orange text-orange-700',
+      VERIFICATION_SUBMITTED: 'bg-tint-yellow text-yellow-700',
+      AUDIT_REVIEW: 'bg-tint-green text-emerald-700',
+      RESOLVED: 'bg-surface-low text-text-secondary',
+    }
+    return (
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${styles[status] || 'bg-surface-low text-text-secondary'}`}>
+        {status?.replace(/_/g, ' ') || 'UNKNOWN'}
+      </span>
+    )
+  }
+
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight mb-6">{t('queue.title')}</h1>
+
+      {/* Status filter tabs */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {STATUS_TABS.map(tab => (
+          <button
+            key={tab.key ?? 'all'}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
+              activeTab === tab.key
+                ? 'bg-primary-override text-white border-primary-override'
+                : 'bg-surface-lowest text-text-secondary border-border-subtle hover:border-primary-override'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
       
       <div className="bg-surface-lowest rounded-lg shadow-sm overflow-hidden">
         {loading ? (
@@ -54,45 +92,49 @@ export default function InvestigationQueue() {
                 <th className="p-4 font-bold">{t('queue.amount')}</th>
                 <th className="p-4 font-bold">{t('queue.riskScore')}</th>
                 <th className="p-4 font-bold">{t('queue.status')}</th>
+                <th className="p-4 font-bold">Audit</th>
                 <th className="p-4 font-bold">{t('queue.action')}</th>
               </tr>
             </thead>
             <tbody className="font-data text-sm">
-              {flags.map((flag, idx) => (
-                <tr key={flag.flag_id} className={`${idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low'}`}>
-                  <td className="p-4 font-mono font-medium text-text-secondary">{flag.flag_id}</td>
-                  <td className="p-4 font-sans font-bold text-text-primary">{flag.beneficiary_name}</td>
+              {cases.map((c, idx) => (
+                <tr key={c.case_id || c.flag_id} className={`${idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low'}`}>
+                  <td className="p-4 font-mono font-medium text-text-secondary">{c.case_id || c.flag_id}</td>
+                  <td className="p-4 font-sans font-bold text-text-primary">{c.beneficiary_name || c.target_entity?.name || '—'}</td>
                   <td className="p-4">
-                    <div className="text-text-primary">{flag.district}</div>
-                    <div className="text-xs text-text-secondary">{flag.scheme}</div>
+                    <div className="text-text-primary">{c.district}</div>
+                    <div className="text-xs text-text-secondary">{c.scheme}</div>
                   </td>
-                  <td className="p-4"><LeakageBadge type={flag.leakage_type} /></td>
-                  <td className="p-4 font-mono font-medium">₹{flag.payment_amount?.toLocaleString('en-IN')}</td>
+                  <td className="p-4"><LeakageBadge type={c.leakage_type || c.anomaly_type} /></td>
+                  <td className="p-4 font-mono font-medium">₹{(c.payment_amount || c.amount || 0)?.toLocaleString('en-IN')}</td>
                   <td className="p-4">
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold font-sans">{flag.risk_score}/100</span>
+                      <span className="text-xs font-bold font-sans">{c.risk_score}/100</span>
                       <div className="w-[100px] bg-surface-low h-1.5 rounded-full overflow-hidden">
                         <div 
-                          className={`h-full ${getRiskColor(flag.risk_label)}`} 
-                          style={{ width: `${flag.risk_score}%` }} 
+                          className={`h-full ${getRiskColor(c.risk_label)}`} 
+                          style={{ width: `${c.risk_score}%` }} 
                         />
                       </div>
                     </div>
                   </td>
+                  <td className="p-4">{getStatusBadge(c.status)}</td>
                   <td className="p-4">
-                    <select 
-                      value={flag.status || 'OPEN'} 
-                      onChange={(e) => handleStatusChange(flag.flag_id, e.target.value)}
-                      className="bg-surface-lowest border border-border-subtle text-text-primary text-xs rounded p-1 font-sans font-medium outline-none focus:ring-2 focus:ring-primary-override"
-                    >
-                      <option value="OPEN">OPEN</option>
-                      <option value="ASSIGNED">ASSIGNED</option>
-                      <option value="RESOLVED">RESOLVED</option>
-                    </select>
+                    {c.audit_report ? (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        c.audit_report.final_decision === 'LEGITIMATE' 
+                          ? 'bg-tint-green text-emerald-700' 
+                          : 'bg-tint-red text-risk-critical'
+                      }`}>
+                        {c.audit_report.final_decision}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-text-secondary">—</span>
+                    )}
                   </td>
                   <td className="p-4">
                     <button 
-                      onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} 
+                      onClick={() => navigate(`/dfo/case/${c.case_id || c.flag_id}`)} 
                       className="text-primary-override hover:underline font-sans font-semibold text-sm"
                     >
                       {t('common.review')}
@@ -100,9 +142,9 @@ export default function InvestigationQueue() {
                   </td>
                 </tr>
               ))}
-              {flags.length === 0 && (
+              {cases.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="p-8 text-center text-text-secondary">{t('queue.noFlags')}</td>
+                  <td colSpan="9" className="p-8 text-center text-text-secondary">{t('queue.noFlags')}</td>
                 </tr>
               )}
             </tbody>

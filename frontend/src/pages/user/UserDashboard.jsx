@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, MapPin, CreditCard, X, Loader2, Check } from 'lucide-react'
-import { getUser, renewKYC } from '../../api'
+import { getUser, completeKYC } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 
 const SCHEME_NEWS = [
@@ -47,12 +47,12 @@ function KYCModal({ user, onClose, onComplete }) {
   }
 
   const INFO_ROWS = [
-    { icon: User, label: t('userDashboard.fullName'), value: user.full_name },
-    { icon: CreditCard, label: t('userDashboard.aadhaar'), value: user.aadhaar_display },
-    { icon: Phone, label: t('userDashboard.mobile'), value: user.phone },
-    { icon: MapPin, label: t('userDashboard.address'), value: `${user.demographics.taluka}, ${user.demographics.district}` },
-    { icon: Shield, label: t('userDashboard.category'), value: user.demographics.category },
-    { icon: CreditCard, label: t('userDashboard.bankAccount'), value: `${user.bank.bank} · ${user.bank.account_display}` },
+    { icon: User, label: t('userDashboard.fullName'), value: user?.full_name || user?.name || '—' },
+    { icon: CreditCard, label: t('userDashboard.aadhaar'), value: user?.aadhaar_display || 'XXXX-XXXX-XXXX' },
+    { icon: Phone, label: t('userDashboard.mobile'), value: user?.phone || '—' },
+    { icon: MapPin, label: t('userDashboard.address'), value: `${user?.demographics?.taluka || '—'}, ${user?.demographics?.district || '—'}` },
+    { icon: Shield, label: t('userDashboard.category'), value: user?.demographics?.category || '—' },
+    { icon: CreditCard, label: t('userDashboard.bankAccount'), value: `${user?.bank?.bank || '—'} · ${user?.bank?.account_display || '—'}` },
   ]
 
   return (
@@ -221,7 +221,7 @@ function KYCModal({ user, onClose, onComplete }) {
 // ─── KYC Card ──────────────────────────────────────────────────────────────────
 function KYCCard({ kyc, onOpenModal }) {
   const { t } = useLanguage()
-  const { is_kyc_compliant, days_remaining, kyc_expiry_date, last_kyc_date } = kyc
+  const { is_kyc_compliant = false, days_remaining = 0, kyc_expiry_date = '—', last_kyc_date = '—' } = kyc || {}
   const isExpiringSoon = days_remaining <= 14
   const isExpired = days_remaining <= 0
 
@@ -279,7 +279,7 @@ export default function UserDashboard() {
   const [readNews, setReadNews] = useState(new Set())
 
   useEffect(() => {
-    getUser('USR-GJ-001').then(data => {
+    getUser().then(data => {
       setUser(data)
       setLoading(false)
     })
@@ -287,12 +287,21 @@ export default function UserDashboard() {
 
   const handleKYCComplete = async () => {
     if (user) {
-      const res = await renewKYC(user.user_id, user.kyc_profile?.dynamic_validity_days || 90)
-      if (res?.success) {
+      try {
+        await completeKYC()
         setUser(prev => ({
           ...prev,
-          kyc_profile: { ...prev.kyc_profile, ...res, is_kyc_compliant: true },
+          kyc_complete: true,
+          kyc_profile: {
+            ...prev.kyc_profile,
+            is_kyc_compliant: true,
+            days_remaining: 90,
+            kyc_expiry_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
+            last_kyc_date: new Date().toISOString().split('T')[0],
+          },
         }))
+      } catch (e) {
+        console.error('KYC error:', e)
       }
     }
     setKycDone(true)
@@ -324,10 +333,10 @@ export default function UserDashboard() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-text-primary tracking-tight">
-            {t('userDashboard.welcome')} {user.full_name.split(' ')[0]} 👋
+            {t('userDashboard.welcome')} {(user?.full_name || user?.name || 'User').split(' ')[0]} 👋
           </h1>
           <p className="text-sm text-text-secondary mt-1 font-data">
-            {user.user_id} · {user.demographics.taluka}, {user.demographics.district} · DBT Beneficiary Portal
+            {user?.user_id} · {user?.demographics?.taluka || '—'}, {user?.demographics?.district || '—'} · DBT Beneficiary Portal
           </p>
         </div>
       </div>
@@ -347,17 +356,17 @@ export default function UserDashboard() {
               </div>
             </div>
           ) : (
-            <KYCCard kyc={user.kyc_profile} onOpenModal={() => setShowKYCModal(true)} />
+            <KYCCard kyc={user?.kyc_profile} onOpenModal={() => setShowKYCModal(true)} />
           )}
 
           {/* Scheme Tracker */}
           <div className="bg-surface-lowest rounded-xl shadow-sm border border-border-subtle overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
               <h2 className="font-bold text-text-primary font-sans">{t('userDashboard.mySchemeApplications')}</h2>
-              <span className="text-xs text-text-secondary font-data">{user.registered_schemes.length} {t('userDashboard.registered')}</span>
+              <span className="text-xs text-text-secondary font-data">{(user?.registered_schemes || []).length} {t('userDashboard.registered')}</span>
             </div>
             <div className="divide-y divide-border-subtle">
-              {user.registered_schemes.map(scheme => {
+              {(user?.registered_schemes || []).map(scheme => {
                 const cfg = STATUS_CONFIG[scheme.status] || STATUS_CONFIG.ACTIVE
                 return (
                   <div key={scheme.scheme_id} className="px-6 py-5">
@@ -370,11 +379,11 @@ export default function UserDashboard() {
                           </span>
                           <span className="text-xs text-text-secondary font-mono">{scheme.scheme_id}</span>
                         </div>
-                        <h3 className="font-bold text-text-primary text-sm leading-snug">{scheme.name}</h3>
-                        <p className="text-xs text-text-secondary font-data mt-1">Registered: {scheme.registration_date}</p>
+                        <h3 className="font-bold text-text-primary text-sm leading-snug">{scheme.name || scheme.scheme_id}</h3>
+                        <p className="text-xs text-text-secondary font-data mt-1">Registered: {scheme.registration_date || scheme.payment_date || '—'}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xl font-bold text-text-primary font-sans">₹{scheme.amount.toLocaleString('en-IN')}</p>
+                        <p className="text-xl font-bold text-text-primary font-sans">₹{(scheme.amount || scheme.payment_amount || 0).toLocaleString('en-IN')}</p>
                         <p className="text-xs text-text-secondary font-data">{t('userDashboard.annualBenefit')}</p>
                       </div>
                     </div>

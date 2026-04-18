@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { api } from '../../api'
 import { LeakageBadge } from '../../components/RiskBadge'
-import { Sparkles, Loader2 } from 'lucide-react'
+import { Sparkles, Loader2, Check } from 'lucide-react'
 import { useLanguage } from '../../i18n/LanguageContext'
 
 export default function CaseDetail() {
@@ -12,11 +12,15 @@ export default function CaseDetail() {
   const [loading, setLoading] = useState(true)
   const [aiLoading, setAiLoading] = useState(false)
   const [evidenceSource, setEvidenceSource] = useState('template')
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     if (!flagId) return
     api.getFlag(flagId).then(res => {
       setFlag(res.data)
+      setSelectedStatus(res.data?.status || 'OPEN')
       setLoading(false)
       setEvidenceSource('template')
     }).catch(e => {
@@ -31,6 +35,20 @@ export default function CaseDetail() {
       setFlag({ ...flag, status: newStatus })
     } catch (e) {
       console.error(e)
+    }
+  }
+
+  const handleSaveChanges = async () => {
+    setSaving(true)
+    setSaved(false)
+    try {
+      await handleStatusChange(selectedStatus)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -142,8 +160,8 @@ export default function CaseDetail() {
           <div className="bg-surface-lowest p-6 rounded-lg shadow-sm">
             <h3 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-4">{t('caseDetail.statusManagement')}</h3>
             <select 
-              value={flag.status || 'OPEN'} 
-              onChange={(e) => handleStatusChange(e.target.value)}
+              value={selectedStatus} 
+              onChange={(e) => setSelectedStatus(e.target.value)}
               className="w-full bg-surface-lowest border border-border-subtle text-text-primary text-sm rounded p-2.5 mb-4 font-sans font-semibold outline-none focus:ring-2 focus:ring-primary-override"
             >
               <option value="OPEN">{t('caseDetail.openPending')}</option>
@@ -151,8 +169,13 @@ export default function CaseDetail() {
               <option value="RESOLVED">{t('caseDetail.resolvedClosed')}</option>
             </select>
 
-            <button className="w-full bg-gradient-to-b from-primary-override to-shell text-white text-sm font-bold rounded p-2.5 hover:shadow-lg transition-all shadow-sm">
-              {t('caseDetail.saveChanges')}
+            <button
+              onClick={handleSaveChanges}
+              disabled={saving || selectedStatus === flag.status}
+              className="w-full bg-gradient-to-b from-primary-override to-shell text-white text-sm font-bold rounded p-2.5 hover:shadow-lg transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" /> : saved ? <Check size={16} /> : null}
+              {saving ? 'Saving...' : saved ? 'Saved!' : t('caseDetail.saveChanges')}
             </button>
           </div>
         </div>

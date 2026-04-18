@@ -29,6 +29,30 @@ export default function Dashboard() {
     return () => clearInterval(timerRef.current)
   }, [loading])
 
+  // Fetch existing data on mount
+  useEffect(() => {
+    const fetchExisting = async () => {
+      try {
+        const [statsRes, flagsRes] = await Promise.all([
+          api.getStats(),
+          api.getFlags()
+        ])
+        if (flagsRes.data && flagsRes.data.length > 0) {
+          setAnalysisData({
+            flags: flagsRes.data,
+            total_transactions: 10306, // from demo data
+            flagged_count: flagsRes.data.length,
+            processing_time_seconds: 0
+          })
+          setStats(statsRes.data)
+        }
+      } catch (e) {
+        console.warn('Could not fetch existing analysis data:', e)
+      }
+    }
+    fetchExisting()
+  }, [])
+
   const runAnalysis = async () => {
     setLoading(true)
     setError(null)
