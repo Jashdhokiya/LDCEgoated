@@ -19,17 +19,27 @@ function RiskScore({ score }) {
 export default function MiddlemenList() {
   const [institutions, setInstitutions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [expanded, setExpanded] = useState(null)
   const [sortKey, setSortKey] = useState('risk_profile.risk_score')
   const [sortDir, setSortDir] = useState('desc')
   const [assignModal, setAssignModal] = useState(null)
 
-  useEffect(() => {
+  const fetchInstitutions = () => {
+    setLoading(true)
+    setError(false)
     getInstitutions().then(data => {
-      setInstitutions(Array.isArray(data) ? data : [])
+      const arr = Array.isArray(data) ? data : []
+      setInstitutions(arr)
+      setError(arr.length === 0)
+      setLoading(false)
+    }).catch(() => {
+      setError(true)
       setLoading(false)
     })
-  }, [])
+  }
+
+  useEffect(() => { fetchInstitutions() }, [])
 
   const sorted = [...institutions].sort((a, b) => {
     const getVal = (obj, key) => key.split('.').reduce((o, k) => o?.[k], obj) ?? 0
@@ -72,7 +82,30 @@ export default function MiddlemenList() {
         </div>
       </div>
 
+      {/* Loading */}
+      {loading && (
+        <div className="flex items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="text-center">
+            <Loader2 size={32} className="animate-spin text-primary-override mx-auto mb-3" />
+            <p className="text-sm text-text-secondary font-data">Loading institutions…</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error / Empty */}
+      {!loading && error && (
+        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-xl shadow-sm border border-gray-100">
+          <Building2 size={40} className="text-gray-300 mb-3" />
+          <p className="text-sm font-bold text-text-primary font-sans mb-1">No institutions loaded</p>
+          <p className="text-xs text-text-secondary font-data mb-4">Backend may be starting up. Try again.</p>
+          <button onClick={fetchInstitutions} className="px-4 py-2 bg-primary-override text-white text-xs font-bold rounded-lg hover:bg-blue-900 transition-all">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Table */}
+      {!loading && !error && (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-gray-50 border-b border-gray-100">
@@ -210,6 +243,7 @@ export default function MiddlemenList() {
           </tbody>
         </table>
       </div>
+      )}
 
       {assignModal && (
         <AssignCaseModal

@@ -37,7 +37,8 @@ const DEFAULT_PAGE = {
 }
 
 export default function App() {
-  const [stage, setStage] = useState('landing') // 'landing' | 'login' | 'app'
+  // Start restoring immediately if token exists — prevents flash to landing
+  const [stage, setStage] = useState(() => tokenStore.get() ? 'restoring' : 'landing')
   const [role, setRole]   = useState(null)
   const [officer, setOfficer] = useState(null)  // decoded JWT payload
   const [activePage, setActivePage] = useState('dashboard')
@@ -64,8 +65,12 @@ export default function App() {
           setStage('app')
         } else {
           tokenStore.clear()
+          setStage('landing')
         }
-      }).catch(() => tokenStore.clear())
+      }).catch(() => { tokenStore.clear(); setStage('landing') })
+    } else if (stage === 'restoring') {
+      // Token was missing or invalid — go to landing
+      setStage('landing')
     }
 
     // Listen for token expiry (emitted by axios 401 interceptor)
@@ -100,6 +105,16 @@ export default function App() {
     setSelectedFlagId(flagId)
     setActivePage('case')
   }
+
+  // ── Restoring session — show brief loading ────────────────────────────
+  if (stage === 'restoring') return (
+    <div className="min-h-screen bg-shell flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-10 h-10 border-3 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-blue-300 text-sm font-data">Restoring session…</p>
+      </div>
+    </div>
+  )
 
   // ── Public pages ──────────────────────────────────────────────────────
   if (stage === 'landing') return <LandingPage onEnter={() => setStage('login')} />
