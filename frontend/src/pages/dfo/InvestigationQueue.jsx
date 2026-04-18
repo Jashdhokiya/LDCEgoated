@@ -1,32 +1,44 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api } from '../../api'
+import { api, getFlags } from '../../api'
 import { RiskBadge, LeakageBadge } from '../../components/RiskBadge'
+import AssignCaseModal from '../../components/AssignCaseModal'
 import { useLanguage } from '../../i18n/LanguageContext'
 
 export default function InvestigationQueue() {
   const { t } = useLanguage()
   const [flags, setFlags] = useState([])
+  const [assignModal, setAssignModal] = useState(null)
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    api.getFlags().then(res => {
-      setFlags(res.data)
+  const refreshFlags = () => {
+    setLoading(true)
+    getFlags().then(data => {
+      setFlags(Array.isArray(data) ? data : [])
       setLoading(false)
     }).catch(e => {
       console.error(e)
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    refreshFlags()
   }, [])
 
   const handleStatusChange = async (flagId, newStatus) => {
     try {
       await api.updateFlagStatus(flagId, newStatus)
-      setFlags(flags.map(f => f.flag_id === flagId ? { ...f, status: newStatus } : f))
+      setFlags(prev => prev.map(f => f.flag_id === flagId ? { ...f, status: newStatus } : f))
     } catch (e) {
       console.error(e)
     }
+  }
+
+  const handleAssigned = () => {
+    setAssignModal(null)
+    refreshFlags()
   }
 
   const getRiskColor = (label) => {
@@ -91,12 +103,20 @@ export default function InvestigationQueue() {
                     </select>
                   </td>
                   <td className="p-4">
-                    <button 
-                      onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} 
-                      className="text-primary-override hover:underline font-sans font-semibold text-sm"
-                    >
-                      {t('common.review')}
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => setAssignModal(flag)}
+                        className="text-primary-override hover:underline font-sans font-semibold text-sm text-left"
+                      >
+                        {t('assignModal.title')}
+                      </button>
+                      <button 
+                        onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} 
+                        className="text-primary-override hover:underline font-sans font-semibold text-sm text-left"
+                      >
+                        {t('common.review')}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -109,6 +129,15 @@ export default function InvestigationQueue() {
           </table>
         )}
       </div>
+
+      {assignModal && (
+        <AssignCaseModal
+          caseId={assignModal.flag_id}
+          caseName={`${assignModal.beneficiary_name} — ${assignModal.scheme}`}
+          onClose={() => setAssignModal(null)}
+          onAssigned={handleAssigned}
+        />
+      )}
     </div>
   )
 }

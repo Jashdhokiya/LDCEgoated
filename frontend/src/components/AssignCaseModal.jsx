@@ -34,7 +34,7 @@ export default function AssignCaseModal({ caseId, caseName, onClose, onAssigned 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-surface-lowest rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-surface-lowest rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
           <div>
@@ -57,7 +57,7 @@ export default function AssignCaseModal({ caseId, caseName, onClose, onAssigned 
             </p>
           </div>
         ) : (
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 overflow-hidden flex flex-col min-h-0">
             <div>
               <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-3 font-data">
                 {t('assignModal.selectVerifier')}
@@ -69,7 +69,7 @@ export default function AssignCaseModal({ caseId, caseName, onClose, onAssigned 
                   <span className="text-sm font-data">{t('assignModal.loadingVerifiers')}</span>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[48vh] overflow-y-auto pr-1">
                   {verifiers.map(v => (
                     <button
                       key={v.officer_id}
