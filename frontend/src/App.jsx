@@ -21,6 +21,7 @@ import DistrictOverview from './pages/admin/DistrictOverview'
 
 // General User
 import UserDashboard from './pages/user/UserDashboard'
+import CompleteProfile from './pages/user/CompleteProfile'
 
 // Audit Officer
 import AuditOfficerDashboard from './pages/audit/AuditOfficerDashboard'
@@ -36,7 +37,7 @@ function LoadingScreen() {
     <div className="min-h-screen bg-shell flex items-center justify-center">
       <div className="text-center">
         <div className="w-10 h-10 border-3 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-blue-300 text-sm font-data">{t('common.restoring')}</p>
+        <p className="text-blue-300 text-sm font-data">{t('common.restoring') || 'Restoring session…'}</p>
       </div>
     </div>
   )
@@ -44,9 +45,15 @@ function LoadingScreen() {
 
 // ── Redirects authenticated users away from public pages ─────────────────
 function PublicRoute({ children }) {
-  const { role, loading } = useAuth()
+  const { role, loading, officer } = useAuth()
   if (loading) return <LoadingScreen />
-  if (role) return <Navigate to={DEFAULT_PATHS[role] || '/dfo/dashboard'} replace />
+  if (role) {
+    // If user role and profile not complete, send to complete-profile
+    if (role === 'USER' && !officer?.profile_complete) {
+      return <Navigate to="/user/complete-profile" replace />
+    }
+    return <Navigate to={DEFAULT_PATHS[role] || '/dfo/dashboard'} replace />
+  }
   return children
 }
 
@@ -55,6 +62,11 @@ function ProtectedLayout() {
   const { role, officer, logout, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!role) return <Navigate to="/login" replace />
+
+  // If USER and profile not complete, force profile completion
+  if (role === 'USER' && !officer?.profile_complete) {
+    return <Navigate to="/user/complete-profile" replace />
+  }
 
   return (
     <div className="flex h-screen bg-workspace text-text-primary">
@@ -66,6 +78,22 @@ function ProtectedLayout() {
   )
 }
 
+// ── Profile completion guard (allows access only if logged in but profile incomplete)
+function ProfileCompletionGuard({ children }) {
+  const { role, officer, loading } = useAuth()
+  if (loading) return <LoadingScreen />
+  if (!role) return <Navigate to="/login" replace />
+  // If profile is already complete, go to dashboard
+  if (role === 'USER' && officer?.profile_complete) {
+    return <Navigate to="/user/dashboard" replace />
+  }
+  // If not USER role, go to their dashboard
+  if (role !== 'USER') {
+    return <Navigate to={DEFAULT_PATHS[role]} replace />
+  }
+  return children
+}
+
 // ── Root App ─────────────────────────────────────────────────────────────
 export default function App() {
   return (
@@ -73,6 +101,11 @@ export default function App() {
       {/* Public routes */}
       <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+
+      {/* Profile completion — outside sidebar layout */}
+      <Route path="/user/complete-profile" element={
+        <ProfileCompletionGuard><CompleteProfile /></ProfileCompletionGuard>
+      } />
 
       {/* Protected routes — all share sidebar layout */}
       <Route element={<ProtectedLayout />}>
