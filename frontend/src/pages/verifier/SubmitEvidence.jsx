@@ -16,6 +16,40 @@ const isInGujarat = (lat, lng) =>
   lat >= GUJARAT_BOUNDS.latMin && lat <= GUJARAT_BOUNDS.latMax &&
   lng >= GUJARAT_BOUNDS.lngMin && lng <= GUJARAT_BOUNDS.lngMax
 
+// ─── Reverse geocode via Nominatim (OpenStreetMap — free, no API key) ────────
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=12`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'EduGuard-DBT/1.0' } }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const addr = data.address || {}
+    return {
+      display: data.display_name || '',
+      district: addr.state_district || addr.county || '',
+      taluka: addr.suburb || addr.town || addr.village || addr.city || '',
+      state: addr.state || '',
+      raw: addr,
+    }
+  } catch {
+    return null
+  }
+}
+
+// ─── Fuzzy location match (handles name variations like Jamjodhpur/Jodiya) ───
+function locationMatches(geoName, assignedName) {
+  if (!geoName || !assignedName) return false
+  const a = geoName.toLowerCase().replace(/[^a-z]/g, '')
+  const b = assignedName.toLowerCase().replace(/[^a-z]/g, '')
+  if (a === b) return true
+  if (a.includes(b) || b.includes(a)) return true
+  // 3-char prefix match for similar names
+  if (a.length >= 3 && b.length >= 3 && a.slice(0, 3) === b.slice(0, 3)) return true
+  return false
+}
+
 const ANOMALY_LABELS = {
   DEAD_BENEFICIARY: 'Deceased Beneficiary',
   DECEASED: 'Deceased Beneficiary',
@@ -28,7 +62,7 @@ const ANOMALY_LABELS = {
 const STEPS = ['Case Info', 'Upload Photo', 'Field Notes', 'Verify & Submit']
 
 // ─── Verification engine (frontend only) ────────────────────────────────────
-function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate }) {
+function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate, photoGeoResult, caseData, isRealGps }) {
   const checks = []
 
   // 1. Photo uploaded
@@ -63,7 +97,31 @@ function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate })
     warn: !gps?.latitude, // warn rather than fail if no GPS
   })
 
-  // 4. Photo recency (within 7 days)
+  // 4. ★ PHOTO GPS LOCATION MATCH — photo must have been taken at the assigned district
+  const assignedDistrict = caseData?.district || ''
+  let gpsMatchPassed = false
+  let gpsMatchDetail = 'No GPS data in photo — upload a geotagged photo taken at the assigned location'
+  if (gps?.latitude && photoGeoResult) {
+    const districtMatch = locationMatches(photoGeoResult.district, assignedDistrict)
+    if (districtMatch) {
+      gpsMatchPassed = true
+      gpsMatchDetail = `✓ Photo taken in ${photoGeoResult.district}${photoGeoResult.taluka ? ', ' + photoGeoResult.taluka : ''} — matches assigned district (${assignedDistrict})`
+    } else {
+      gpsMatchPassed = false
+      gpsMatchDetail = `✗ Photo taken in ${photoGeoResult.district || photoGeoResult.state || 'unknown location'} but case is assigned to ${assignedDistrict}. Upload a photo taken at the correct location.`
+    }
+  } else if (gps?.latitude && !photoGeoResult) {
+    gpsMatchDetail = 'Photo GPS detected but location lookup pending…'
+  }
+  checks.push({
+    id: 'gps_location_match',
+    label: `Photo location matches assigned district (${assignedDistrict || 'N/A'})`,
+    pass: gpsMatchPassed,
+    detail: gpsMatchDetail + (!isRealGps && !gpsMatchPassed ? ' (demo GPS — not blocking)' : ''),
+    warn: !gps?.latitude || !isRealGps, // warn (don't block) if no GPS or demo GPS
+  })
+
+  // 5. Photo recency (within 7 days)
   let recencyPassed = false
   let recencyDetail = 'No EXIF timestamp found'
   if (exifDate) {
@@ -81,7 +139,7 @@ function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate })
     warn: !exifDate,
   })
 
-  // 5. Field notes filled
+  // 6. Field notes filled
   checks.push({
     id: 'notes',
     label: 'Field observations recorded',
@@ -91,7 +149,7 @@ function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate })
       : `Too brief — needs at least 30 characters (currently ${notes.trim().length})`,
   })
 
-  // 6. Beneficiary presence noted
+  // 7. Beneficiary presence noted
   checks.push({
     id: 'presence',
     label: 'Beneficiary presence documented',
@@ -137,6 +195,11 @@ export default function SubmitEvidence() {
   const [done, setDone]     = useState(false)
   const fileRef = useRef()
 
+  // Photo GPS reverse geocode result
+  const [photoGeoResult, setPhotoGeoResult] = useState(null)
+  const [geocoding, setGeocoding] = useState(false)
+  const [isRealGps, setIsRealGps] = useState(false)
+
   // Fallback: simulate realistic GPS if photo has no EXIF (demo mode)
   const DEMO_GPS = { latitude: 23.0225, longitude: 72.5714 } // Ahmedabad
 
@@ -147,18 +210,32 @@ export default function SubmitEvidence() {
     setExtracting(true)
     setGps(null)
     setExifDate(null)
+    setPhotoGeoResult(null)
+
+    // Helper: set GPS + reverse geocode it
+    const applyGps = async (lat, lng) => {
+      setGps({ latitude: lat, longitude: lng })
+      setGeocoding(true)
+      const geo = await reverseGeocode(lat, lng)
+      setPhotoGeoResult(geo)
+      setGeocoding(false)
+    }
+
     try {
       const exif = await exifr.parse(file, { gps: true, tiff: true })
       if (exif?.latitude && exif?.longitude) {
-        setGps({ latitude: exif.latitude, longitude: exif.longitude })
+        setIsRealGps(true)
+        await applyGps(exif.latitude, exif.longitude)
       } else {
         // Demo fallback — in real deployment this would stay null
-        setGps(DEMO_GPS)
+        setIsRealGps(false)
+        await applyGps(DEMO_GPS.latitude, DEMO_GPS.longitude)
       }
       if (exif?.DateTimeOriginal) setExifDate(exif.DateTimeOriginal)
       else setExifDate(new Date()) // demo fallback
     } catch {
-      setGps(DEMO_GPS)
+      setIsRealGps(false)
+      await applyGps(DEMO_GPS.latitude, DEMO_GPS.longitude)
       setExifDate(new Date())
     } finally {
       setExtracting(false)
@@ -173,7 +250,7 @@ export default function SubmitEvidence() {
   }
 
   const runVerification = () => {
-    const result = verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate })
+    const result = verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate, photoGeoResult, caseData, isRealGps })
     setVerifyResult(result)
     setStep(3)
   }
@@ -188,6 +265,8 @@ export default function SubmitEvidence() {
         verifier_notes: notes,
         ai_verification_match: verifyResult?.approved ?? null,
         confidence_score: verifyResult?.score ?? 0,
+        reverse_geocode_district: photoGeoResult?.district || null,
+        reverse_geocode_taluka: photoGeoResult?.taluka || null,
       })
       setDone(true)
     } catch (err) {
@@ -330,7 +409,7 @@ export default function SubmitEvidence() {
                     <p className="text-sm font-bold">{photoFile?.name}</p>
                     <p className="text-xs opacity-70">{(photoFile?.size / 1024).toFixed(0)} KB</p>
                   </div>
-                  <button onClick={e => { e.stopPropagation(); setPhotoFile(null); setPhotoPreview(null); setGps(null); setExifDate(null) }}
+                  <button onClick={e => { e.stopPropagation(); setPhotoFile(null); setPhotoPreview(null); setGps(null); setExifDate(null); setPhotoGeoResult(null) }}
                     className="ml-auto w-8 h-8 rounded-full bg-surface-lowest/20 hover:bg-surface-lowest/30 flex items-center justify-center">
                     <X size={14} className="text-white" />
                   </button>
@@ -387,6 +466,42 @@ export default function SubmitEvidence() {
                   Consider retaking photo with location services enabled. Submission without GPS will be flagged.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Photo location verification result */}
+          {geocoding && (
+            <div className="flex items-center gap-3 p-4 bg-tint-blue rounded-xl border border-border-subtle">
+              <Loader2 size={16} className="animate-spin text-blue-600" />
+              <p className="text-sm text-blue-700 font-data">Verifying photo location against assigned district…</p>
+            </div>
+          )}
+
+          {!extracting && !geocoding && photoFile && gps && photoGeoResult && (
+            <div className={`p-4 rounded-xl border ${
+              locationMatches(photoGeoResult.district, caseData?.district)
+                ? 'bg-tint-emerald border-emerald-200' : 'bg-tint-red border-red-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-1">
+                {locationMatches(photoGeoResult.district, caseData?.district)
+                  ? <CheckCircle size={16} className="text-emerald-600" />
+                  : <XCircle size={16} className="text-red-500" />
+                }
+                <p className={`text-sm font-bold ${
+                  locationMatches(photoGeoResult.district, caseData?.district) ? 'text-emerald-700' : 'text-red-700'
+                }`}>
+                  {locationMatches(photoGeoResult.district, caseData?.district)
+                    ? `✓ Photo location matches: ${photoGeoResult.district}`
+                    : `✗ Location mismatch: Photo is from ${photoGeoResult.district || 'unknown'}`
+                  }
+                </p>
+              </div>
+              <p className="text-xs font-data text-text-secondary ml-6">
+                {locationMatches(photoGeoResult.district, caseData?.district)
+                  ? `Photo taken in ${photoGeoResult.district}${photoGeoResult.taluka ? ' (' + photoGeoResult.taluka + ')' : ''} — matches assigned district (${caseData?.district})`
+                  : `Case is assigned to ${caseData?.district}. This photo was taken in ${photoGeoResult.district || photoGeoResult.state || 'another location'}. Please upload a photo from the correct location.`
+                }
+              </p>
             </div>
           )}
 

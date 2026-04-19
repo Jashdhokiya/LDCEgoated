@@ -136,6 +136,19 @@ async def get_profile(user: dict = Depends(require_role("USER"))):
             "dynamic_validity_days": 90,
         }
 
+    # Always recompute days_remaining from expiry date (fixes stale DB values)
+    kyc = doc["kyc_profile"]
+    kyc["dynamic_validity_days"] = 90  # enforce 90-day cycle
+    exp = kyc.get("kyc_expiry_date", "")
+    if exp:
+        try:
+            expiry_dt = datetime.fromisoformat(exp)
+            remaining = (expiry_dt - datetime.utcnow()).days
+            kyc["days_remaining"] = max(0, min(90, remaining))
+            kyc["is_kyc_compliant"] = remaining > 0
+        except (ValueError, TypeError):
+            pass
+
     return doc
 
 
@@ -227,18 +240,18 @@ async def complete_kyc(user: dict = Depends(require_role("USER"))):
         raise HTTPException(400, "Complete your profile first")
 
     now = datetime.utcnow()
-    from dateutil.relativedelta import relativedelta
-    expiry = now + relativedelta(years=1)
+    from datetime import timedelta
+    expiry = now + timedelta(days=90)
 
     update = {
         "kyc_complete": True,
         "kyc_completed_at": now.isoformat(),
         "kyc_profile": {
             "is_kyc_compliant": True,
-            "days_remaining": 365,
+            "days_remaining": 90,
             "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
             "last_kyc_date": now.strftime("%Y-%m-%d"),
-            "dynamic_validity_days": 365,
+            "dynamic_validity_days": 90,
         },
     }
 
@@ -280,12 +293,8 @@ async def face_verified_kyc(
     now = datetime.utcnow()
 
     if result["match"]:
-        try:
-            from dateutil.relativedelta import relativedelta
-            expiry = now + relativedelta(years=1)
-        except ImportError:
-            from datetime import timedelta
-            expiry = now + timedelta(days=365)
+        from datetime import timedelta
+        expiry = now + timedelta(days=90)
 
         update = {
             "kyc_complete": True,
@@ -294,10 +303,10 @@ async def face_verified_kyc(
             "kyc_confidence": result["confidence"],
             "kyc_profile": {
                 "is_kyc_compliant": True,
-                "days_remaining": 365,
+                "days_remaining": 90,
                 "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
                 "last_kyc_date": now.strftime("%Y-%m-%d"),
-                "dynamic_validity_days": 365,
+                "dynamic_validity_days": 90,
                 "verification_method": "FACE_RECOGNITION",
                 "confidence_score": result["confidence"],
             },

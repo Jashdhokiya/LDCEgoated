@@ -12,6 +12,9 @@ All routes require a valid JWT Bearer token EXCEPT:
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
+load_dotenv()  # must happen BEFORE importing modules that read env vars
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
