@@ -123,6 +123,23 @@ def send_welcome_email(to_email: str, name: str, user_id: str) -> bool:
     return _send_email(to_email, "Welcome to EduGuard — Account Created", _base_template("Welcome to EduGuard", body))
 
 
+def send_magic_link_email(to_email: str, name: str, link_url: str) -> bool:
+    """Send magic link for email verification and profile completion."""
+    body = f"""
+    <p style="margin:0 0 16px">Hello <strong style="color:#fff">{name}</strong>,</p>
+    <p>Please verify your email address to log in and complete your <strong style="color:#60a5fa">EduGuard</strong> profile.</p>
+
+    <div style="text-align:center; margin:32px 0;">
+      <a href="{link_url}" style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#ffffff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:8px;font-size:15px;letter-spacing:0.5px">
+        Verify Email & Complete Profile
+      </a>
+    </div>
+
+    <p style="color:#9ca3af;font-size:12px">This link will expire in 15 minutes. If you did not request this, you can safely ignore this email.</p>
+    """
+    return _send_email(to_email, "EduGuard — Verify Your Email", _base_template("Verify Your Email", body))
+
+
 def send_profile_complete_email(to_email: str, name: str, district: str) -> bool:
     """Send confirmation after profile completion."""
     body = f"""

@@ -22,6 +22,7 @@ import DistrictOverview from './pages/admin/DistrictOverview'
 // General User
 import UserDashboard from './pages/user/UserDashboard'
 import CompleteProfile from './pages/user/CompleteProfile'
+import VerifyEmail from './pages/user/VerifyEmail'
 
 // Audit Officer
 import AuditOfficerDashboard from './pages/audit/AuditOfficerDashboard'
@@ -103,6 +104,7 @@ export default function App() {
       {/* Public routes */}
       <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       {/* Profile completion — outside sidebar layout */}
       <Route path="/user/complete-profile" element={

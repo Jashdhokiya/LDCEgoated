@@ -31,7 +31,7 @@ export default function CompleteProfile() {
   const [geography, setGeography] = useState([])
 
   // Form fields
-  const [email, setEmail]         = useState('')
+  const [email]                   = useState(officer?.email || '')
   const [phone, setPhone]         = useState('')
   const [gender, setGender]       = useState('')
   const [dob, setDob]             = useState('')
@@ -51,7 +51,6 @@ export default function CompleteProfile() {
   const districtTalukas = geography.find(g => g.district === district)?.talukas || []
 
   const validateStep1 = () => {
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) return 'Enter a valid email address'
     if (!phone || phone.length < 10) return 'Enter a valid 10-digit phone number'
     if (!gender) return 'Select your gender'
     if (!dob) return 'Enter your date of birth'
@@ -89,7 +88,6 @@ export default function CompleteProfile() {
     setError(''); setLoading(true)
     try {
       const data = await completeProfile({
-        email:                email.trim(),
         phone:                phone.trim(),
         district:             district,
         taluka:               taluka,
@@ -169,8 +167,13 @@ export default function CompleteProfile() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-text-secondary mb-1">Email Address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="yourname@gmail.com" className={inputClass} />
+                  <div className="relative">
+                    <input type="email" value={email} readOnly disabled
+                      className="w-full px-4 py-2.5 bg-surface-low border border-border-subtle text-sm text-text-secondary rounded-lg outline-none opacity-80 cursor-not-allowed" />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      <CheckCircle size={10} /> Verified
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-text-secondary mb-1">Phone Number</label>

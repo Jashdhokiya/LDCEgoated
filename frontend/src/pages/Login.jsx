@@ -38,6 +38,7 @@ export default function Login() {
   // User flow state
   const [aadhaarHash, setAadhaarHash] = useState('')
   const [userName, setUserName]     = useState('')
+  const [userEmail, setUserEmail]   = useState('')
   const [userPassword, setUserPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
@@ -101,14 +102,20 @@ export default function Login() {
 
   // ── User register submit ──────────────────────────────────────────────
   const handleUserRegister = async () => {
-    if (!userName || !aadhaarHash || !userPassword) { setError('All fields are required'); return }
+    if (!userName || !userEmail || !aadhaarHash || !userPassword) { setError('All fields are required'); return }
+    if (!/^\S+@\S+\.\S+$/.test(userEmail)) { setError('Please enter a valid email address'); return }
     if (userPassword !== confirmPassword) { setError('Passwords do not match'); return }
     if (userPassword.length < 6) { setError('Password must be at least 6 characters'); return }
     setLoading(true); setError('')
     try {
-      const data = await registerUser(userName, aadhaarHash, userPassword)
-      authLogin('USER', data)
-      navigate('/user/complete-profile', { replace: true })
+      const data = await registerUser(userName, userEmail, aadhaarHash, userPassword)
+      if (data.requires_verification) {
+        setUserTab('check-email')
+      } else {
+        // Fallback if backend doesn't do magic link
+        authLogin('USER', data)
+        navigate('/user/complete-profile', { replace: true })
+      }
     } catch (err) {
       setError(err?.response?.data?.detail || 'Registration failed')
     } finally { setLoading(false) }
@@ -313,6 +320,7 @@ export default function Login() {
               </div>
 
               {/* Tabs */}
+              {userTab !== 'check-email' && (
               <div className="flex mb-6 bg-surface-low rounded-lg p-1">
                 <button onClick={() => { setUserTab('login'); setError('') }}
                   className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${userTab === 'login' ? 'bg-surface-lowest text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
@@ -323,71 +331,101 @@ export default function Login() {
                   Register
                 </button>
               </div>
+              )}
 
               <div className="space-y-4">
-                {/* Aadhaar hash field (both tabs) */}
-                <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Aadhaar Number</label>
-                  <div className="relative">
-                    <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
-                    <input type="text" value={aadhaarHash} onChange={e => { setAadhaarHash(e.target.value); setError('') }}
-                      placeholder="Enter your 12-digit Aadhaar"
-                      maxLength={12}
-                      className="w-full pl-10 pr-4 py-3 bg-surface-lowest border border-border-subtle text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
-                    />
+                {userTab === 'check-email' ? (
+                  <div className="text-center py-6">
+                    <div className="w-16 h-16 bg-gradient-to-br from-blue-700 to-blue-900 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-surface-lowest">
+                      <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-bold text-text-primary mb-2">Check Your Email</h3>
+                    <p className="text-sm text-text-secondary">We've sent a magic link to <strong className="text-text-primary">{userEmail}</strong>. Please click the link within 15 minutes to verify your account and complete your profile.</p>
+                    <button onClick={() => { setUserTab('login'); setError('') }}
+                      className="mt-6 w-full py-3 border border-border-subtle bg-surface-low text-text-primary text-sm font-bold rounded-lg hover:bg-surface-medium transition-all">
+                      Return to Login
+                    </button>
                   </div>
-                </div>
-
-                {/* Name (register only) */}
-                {userTab === 'register' && (
-                  <div>
-                    <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Full Name (as per Aadhaar)</label>
-                    <input type="text" value={userName} onChange={e => { setUserName(e.target.value); setError('') }}
-                      placeholder="Enter your full name"
-                      className="w-full px-4 py-3 bg-surface-lowest border border-border-subtle text-sm text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
-                    />
-                  </div>
-                )}
-
-                {/* Password */}
-                <div>
-                  <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Password</label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
-                    <input type="password" value={userPassword} onChange={e => { setUserPassword(e.target.value); setError('') }}
-                      placeholder={userTab === 'register' ? 'Create a password (min 6 chars)' : 'Enter your password'}
-                      className="w-full pl-10 pr-4 py-3 bg-surface-lowest border border-border-subtle text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
-                      onKeyDown={e => e.key === 'Enter' && userTab === 'login' && handleUserLogin()}
-                    />
-                  </div>
-                </div>
-
-                {/* Confirm password (register only) */}
-                {userTab === 'register' && (
-                  <div>
-                    <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Confirm Password</label>
-                    <input type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError('') }}
-                      placeholder="Re-enter your password"
-                      className="w-full px-4 py-3 bg-surface-lowest border border-border-subtle text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
-                      onKeyDown={e => e.key === 'Enter' && handleUserRegister()}
-                    />
-                  </div>
-                )}
-
-                <ErrorMessage error={error} />
-
-                {userTab === 'login' ? (
-                  <button onClick={handleUserLogin} disabled={loading}
-                    className="w-full py-3 bg-gradient-to-b from-emerald-700 to-emerald-900 text-white text-sm font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60">
-                    {loading ? <Loader2 size={16} className="animate-spin" /> : <User size={16} />}
-                    {loading ? 'Signing in…' : 'Sign In'}
-                  </button>
                 ) : (
-                  <button onClick={handleUserRegister} disabled={loading}
-                    className="w-full py-3 bg-gradient-to-b from-emerald-700 to-emerald-900 text-white text-sm font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60">
-                    {loading ? <Loader2 size={16} className="animate-spin" /> : <User size={16} />}
-                    {loading ? 'Creating account…' : 'Create Account'}
-                  </button>
+                  <>
+                    {/* Aadhaar hash field (both tabs) */}
+                    <div>
+                      <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Aadhaar Number</label>
+                      <div className="relative">
+                        <Fingerprint className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
+                        <input type="text" value={aadhaarHash} onChange={e => { setAadhaarHash(e.target.value); setError('') }}
+                          placeholder="Enter your 12-digit Aadhaar"
+                          maxLength={12}
+                          className="w-full pl-10 pr-4 py-3 bg-surface-lowest border border-border-subtle text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Name (register only) */}
+                    {userTab === 'register' && (
+                      <div>
+                        <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Full Name (as per Aadhaar)</label>
+                        <input type="text" value={userName} onChange={e => { setUserName(e.target.value); setError('') }}
+                          placeholder="Enter your full name"
+                          className="w-full px-4 py-3 bg-surface-lowest border border-border-subtle text-sm text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
+                        />
+                      </div>
+                    )}
+
+                    {/* Email (register only) */}
+                    {userTab === 'register' && (
+                      <div>
+                        <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Email Address</label>
+                        <input type="email" value={userEmail} onChange={e => { setUserEmail(e.target.value); setError('') }}
+                          placeholder="yourname@gmail.com"
+                          className="w-full px-4 py-3 bg-surface-lowest border border-border-subtle text-sm text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
+                        />
+                      </div>
+                    )}
+
+                    {/* Password */}
+                    <div>
+                      <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Password</label>
+                      <div className="relative">
+                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={16} />
+                        <input type="password" value={userPassword} onChange={e => { setUserPassword(e.target.value); setError('') }}
+                          placeholder={userTab === 'register' ? 'Create a password (min 6 chars)' : 'Enter your password'}
+                          className="w-full pl-10 pr-4 py-3 bg-surface-lowest border border-border-subtle text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
+                          onKeyDown={e => e.key === 'Enter' && userTab === 'login' && handleUserLogin()}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Confirm password (register only) */}
+                    {userTab === 'register' && (
+                      <div>
+                        <label className="block text-xs font-bold text-text-secondary uppercase tracking-widest mb-2">Confirm Password</label>
+                        <input type="password" value={confirmPassword} onChange={e => { setConfirmPassword(e.target.value); setError('') }}
+                          placeholder="Re-enter your password"
+                          className="w-full px-4 py-3 bg-surface-lowest border border-border-subtle text-sm font-mono text-text-primary rounded-lg outline-none focus:ring-2 focus:ring-primary-override/30"
+                          onKeyDown={e => e.key === 'Enter' && handleUserRegister()}
+                        />
+                      </div>
+                    )}
+
+                    <ErrorMessage error={error} />
+
+                    {userTab === 'login' ? (
+                      <button onClick={handleUserLogin} disabled={loading}
+                        className="w-full py-3 bg-gradient-to-b from-emerald-700 to-emerald-900 text-white text-sm font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                        {loading ? <Loader2 size={16} className="animate-spin" /> : <User size={16} />}
+                        {loading ? 'Signing in…' : 'Sign In'}
+                      </button>
+                    ) : (
+                      <button onClick={handleUserRegister} disabled={loading}
+                        className="w-full py-3 bg-gradient-to-b from-emerald-700 to-emerald-900 text-white text-sm font-bold rounded-lg shadow hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-60">
+                        {loading ? <Loader2 size={16} className="animate-spin" /> : <User size={16} />}
+                        {loading ? 'Creating account…' : 'Create Account'}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </>

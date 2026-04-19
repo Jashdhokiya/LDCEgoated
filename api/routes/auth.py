@@ -49,6 +49,7 @@ class UserLoginRequest(BaseModel):
 
 class UserRegisterRequest(BaseModel):
     name: str
+    email: str
     aadhaar_hash: str
     password: str
 
@@ -200,28 +201,42 @@ def _login_user(body: dict):
 def register(body: UserRegisterRequest):
     """
     Register a new citizen account.
-    Minimal info: name + aadhaar_hash + password.
-    Profile completion happens AFTER first login.
+    Minimal info: name + email + aadhaar_hash + password.
+    Sends a magic link to complete profile.
     """
     db = _get_db()
     if db is None:
         raise HTTPException(503, "Database unavailable")
+
+    if not body.email or "@" not in body.email:
+         raise HTTPException(400, "Valid email is required.")
 
     # Check if already registered
     existing = db["users"].find_one({"aadhaar_hash": body.aadhaar_hash})
     if existing:
         raise HTTPException(409, "An account with this Aadhaar already exists. Please login.")
 
+    existing_email = db["users"].find_one({"email": body.email.lower().strip()})
+    if existing_email:
+        raise HTTPException(409, "An account with this email already exists.")
+
     import uuid
+    from datetime import timedelta
     user_id = f"USR-{uuid.uuid4().hex[:8].upper()}"
+    magic_token = uuid.uuid4().hex
+    expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
     user_doc = {
         "user_id":          user_id,
         "name":             body.name.strip(),
+        "email":            body.email.lower().strip(),
         "aadhaar_hash":     body.aadhaar_hash.strip(),
         "password_hash":    hash_password(body.password),
         "profile_complete": False,
         "kyc_complete":     False,
+        "email_verified":   False,
+        "magic_link_token": magic_token,
+        "magic_link_expiry": expiry_time.isoformat(),
         "created_at":       datetime.utcnow().isoformat(),
         # These will be filled during profile completion
         "phone":            None,
@@ -236,38 +251,71 @@ def register(body: UserRegisterRequest):
 
     db["users"].insert_one(user_doc)
 
-    # Auto-login after registration
-    token_payload = {
-        "sub":      user_id,
-        "role":     "USER",
-        "name":     body.name.strip(),
-        "email":    "",
-        "district": None,
-        "profile_complete": False,
-    }
-    token = create_access_token(token_payload)
-
-    # Send welcome email if dummy email format used (or if we collect email later)
-    # Right now, since citizen registration does not collect email explicitly in the body,
-    # we'll assume there isn't one yet unless added later. But we add the call logic here.
+    # Send magic link email
     try:
-        from ..email_service import send_welcome_email
-        email = body.name.replace(" ", "").lower() + "@example.com" # Placeholder if real email isn't available
-        send_welcome_email(email, body.name.strip(), user_id)
+        from ..email_service import send_magic_link_email
+        magic_link = f"http://localhost:5173/verify-email?token={magic_token}"
+        send_magic_link_email(body.email.strip(), body.name.strip(), magic_link)
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
-        logger.warning(f"Welcome email failed: {e}")
+        logger.warning(f"Magic link email failed: {e}")
+
+    # Don't return an access token yet so we force email verification
+    return {
+        "message": "Registration successful. Please check your email to verify your account.",
+        "requires_verification": True
+    }
+
+
+class VerifyMagicLinkRequest(BaseModel):
+    token: str
+
+@router.post("/verify-magic-link")
+def verify_magic_link(body: VerifyMagicLinkRequest):
+    """Verifies a magic link, updates email_verified state, and returns auth token."""
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+
+    if not body.token:
+        raise HTTPException(400, "Token is missing")
+
+    user = db["users"].find_one({"magic_link_token": body.token})
+    if not user:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired link.")
+
+    expiry = datetime.fromisoformat(user["magic_link_expiry"])
+    if datetime.utcnow() > expiry:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Verification link has expired. Please log in to request a new one.")
+
+    # Link valid. Clear it, mark verified.
+    db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {"email_verified": True}, "$unset": {"magic_link_token": "", "magic_link_expiry": ""}}
+    )
+
+    # Auto-login after successful verification
+    token_payload = {
+        "sub":      user["user_id"],
+        "role":     "USER",
+        "name":     user["name"],
+        "email":    user["email"],
+        "district": user.get("district"),
+        "profile_complete": user.get("profile_complete", False),
+    }
+    from ..auth import create_access_token
+    token = create_access_token(token_payload)
 
     return {
         "access_token":   token,
         "token_type":     "bearer",
         "role":           "USER",
-        "name":           body.name.strip(),
-        "officer_id":     user_id,
-        "district":       None,
-        "profile_complete": False,
-        "message":        "Registration successful. Please complete your profile.",
+        "name":           user["name"],
+        "officer_id":     user["user_id"],
+        "district":       user.get("district"),
+        "profile_complete": user.get("profile_complete", False),
+        "message":        "Email verified successfully. You can now complete your profile.",
     }
 
 

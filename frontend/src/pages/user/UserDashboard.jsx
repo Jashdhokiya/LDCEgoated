@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, MapPin, CreditCard, X, Loader2, Check, XCircle } from 'lucide-react'
-import { getUser, faceVerifyKYC, completeKYC, uploadFaceReference } from '../../api'
+import { getUser, faceVerifyKYC, completeKYC, uploadFaceReference, getEligibleSchemes, getSchemePreferences, optInScheme, optOutScheme } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 import WebcamCapture from '../../components/WebcamCapture'
 
@@ -276,13 +276,58 @@ export default function UserDashboard() {
   const [showKYCModal, setShowKYCModal] = useState(false)
   const [kycDone, setKycDone] = useState(false)
   const [readNews, setReadNews] = useState(new Set())
+  const [eligibleSchemes, setEligibleSchemes] = useState([])
+  const [schemePrefs, setSchemePrefs] = useState({ opted_in_scheme_ids: [] })
+  const [schemeBusy, setSchemeBusy] = useState({})
+  const [schemeMessage, setSchemeMessage] = useState('')
 
   useEffect(() => {
-    getUser().then(data => {
-      setUser(data)
-      setLoading(false)
-    })
+    async function loadDashboard() {
+      try {
+        const [profile, eligibleRes, prefsRes] = await Promise.all([
+          getUser(),
+          getEligibleSchemes(),
+          getSchemePreferences(),
+        ])
+        setUser(profile)
+        setEligibleSchemes(eligibleRes?.eligible || [])
+        setSchemePrefs(prefsRes || { opted_in_scheme_ids: [] })
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadDashboard()
   }, [])
+
+  const refreshSchemeState = async () => {
+    const [eligibleRes, prefsRes, profile] = await Promise.all([
+      getEligibleSchemes(),
+      getSchemePreferences(),
+      getUser(),
+    ])
+    setEligibleSchemes(eligibleRes?.eligible || [])
+    setSchemePrefs(prefsRes || { opted_in_scheme_ids: [] })
+    setUser(profile)
+  }
+
+  const handleSchemeToggle = async (schemeId, isOptedIn) => {
+    setSchemeBusy(prev => ({ ...prev, [schemeId]: true }))
+    setSchemeMessage('')
+    try {
+      if (isOptedIn) {
+        await optOutScheme(schemeId)
+        setSchemeMessage(`Opted out from ${schemeId}`)
+      } else {
+        await optInScheme(schemeId)
+        setSchemeMessage(`Opted in to ${schemeId}`)
+      }
+      await refreshSchemeState()
+    } catch (err) {
+      setSchemeMessage(err?.response?.data?.detail || 'Unable to update scheme preference right now')
+    } finally {
+      setSchemeBusy(prev => ({ ...prev, [schemeId]: false }))
+    }
+  }
 
   const handleKYCComplete = async () => {
     if (user) {
@@ -316,6 +361,8 @@ export default function UserDashboard() {
       </div>
     )
   }
+
+  const optedSet = new Set(schemePrefs?.opted_in_scheme_ids || user?.opted_in_scheme_ids || [])
 
   return (
     <div className="p-8 pb-20 font-sans max-w-6xl mx-auto">
@@ -419,6 +466,56 @@ export default function UserDashboard() {
                 )
               })}
             </div>
+          </div>
+
+          {/* Scheme Management */}
+          <div className="bg-surface-lowest rounded-xl shadow-sm border border-border-subtle overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
+              <h2 className="font-bold text-text-primary font-sans">Scheme Management</h2>
+              <span className="text-xs text-text-secondary font-data">{optedSet.size} opted in</span>
+            </div>
+
+            {schemeMessage && (
+              <div className="px-6 py-3 border-b border-border-subtle bg-surface-low">
+                <p className="text-xs font-data text-text-secondary">{schemeMessage}</p>
+              </div>
+            )}
+
+            {eligibleSchemes.length === 0 ? (
+              <div className="px-6 py-6 text-sm text-text-secondary font-data">
+                No eligible schemes available right now. Complete profile details to unlock more options.
+              </div>
+            ) : (
+              <div className="divide-y divide-border-subtle">
+                {eligibleSchemes.map((scheme) => {
+                  const schemeId = scheme.scheme_id
+                  const isOptedIn = optedSet.has(schemeId)
+                  const isBusy = !!schemeBusy[schemeId]
+                  return (
+                    <div key={schemeId} className="px-6 py-4 flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-text-primary font-sans truncate">{scheme.name || schemeId}</p>
+                        <p className="text-xs text-text-secondary font-data mt-1">
+                          {schemeId} · Annual Benefit: ₹{(scheme.amount || 0).toLocaleString('en-IN')}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => handleSchemeToggle(schemeId, isOptedIn)}
+                        disabled={isBusy}
+                        className={`min-w-[108px] px-3 py-2 text-xs font-bold rounded-lg transition-all ${
+                          isOptedIn
+                            ? 'bg-tint-red text-risk-critical border border-red-200 hover:bg-red-100'
+                            : 'bg-tint-emerald text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                        } ${isBusy ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        {isBusy ? 'Updating...' : isOptedIn ? 'Opt Out' : 'Opt In'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
 
