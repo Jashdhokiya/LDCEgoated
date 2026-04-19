@@ -23,6 +23,7 @@ from .routes.admin    import router as admin_router
 from .routes.verifier import router as verifier_router
 from .routes.audit    import router as audit_router
 from .routes.user     import router as user_router
+from .routes.aadhaar  import router as aadhaar_router
 
 
 # ── Startup / shutdown lifecycle ──────────────────────────────────────────────
@@ -74,6 +75,7 @@ app.include_router(admin_router)
 app.include_router(verifier_router)
 app.include_router(audit_router)
 app.include_router(user_router)
+app.include_router(aadhaar_router)
 
 
 # ── Public endpoints ──────────────────────────────────────────────────────────

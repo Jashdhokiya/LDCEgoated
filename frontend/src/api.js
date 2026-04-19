@@ -329,6 +329,34 @@ export async function renewKYC() {
   return completeKYC()
 }
 
+// ── AADHAAR VERIFICATION ──────────────────────────────────────────────────────
+
+export async function aadhaarSendOTP(aadhaarNumber) {
+  const res = await client.post('/api/aadhaar/send-otp', { aadhaar_number: aadhaarNumber })
+  return res.data
+}
+
+export async function aadhaarVerifyOTP(transactionId, otp) {
+  const res = await client.post('/api/aadhaar/verify-otp', { transaction_id: transactionId, otp })
+  return res.data
+}
+
+export async function aadhaarApiStatus() {
+  return safe(() => client.get('/api/aadhaar/status'), { configured: false, demo_aadhaar: '999999990019', demo_otp: '123456' })
+}
+
+// ── IFSC LOOKUP (Razorpay public API — no auth needed) ────────────────────────
+
+export async function lookupIFSC(ifsc) {
+  try {
+    const res = await fetch(`https://ifsc.razorpay.com/${ifsc.toUpperCase()}`)
+    if (!res.ok) return null
+    return res.json()  // { BANK, BRANCH, ADDRESS, CITY, DISTRICT, STATE, CONTACT, IFSC }
+  } catch {
+    return null
+  }
+}
+
 // ── Legacy compatibility ──────────────────────────────────────────────────────
 
 export const api = {
