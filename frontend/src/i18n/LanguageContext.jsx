@@ -25,6 +25,7 @@ export function LanguageProvider({ children }) {
   }, [])
 
   const t = useCallback((key) => {
+    if (!key) return null
     return resolve(DICTIONARIES[lang], key) ?? resolve(DICTIONARIES.en, key) ?? key
   }, [lang])
 

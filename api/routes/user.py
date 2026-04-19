@@ -65,6 +65,16 @@ class FaceUploadRequest(BaseModel):
     face_photo: str  # base64-encoded selfie
 
 
+class BankUpdateRequest(BaseModel):
+    bank_name: str
+    account_number: str
+    ifsc: str
+
+class SupportRequest(BaseModel):
+    subject: str
+    message: str
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.get("/profile")
@@ -234,18 +244,18 @@ async def complete_kyc(user: dict = Depends(require_role("USER"))):
         raise HTTPException(400, "Complete your profile first")
 
     now = datetime.utcnow()
-    from dateutil.relativedelta import relativedelta
-    expiry = now + relativedelta(years=1)
+    from datetime import timedelta
+    expiry = now + timedelta(days=90)
 
     update = {
         "kyc_complete": True,
         "kyc_completed_at": now.isoformat(),
         "kyc_profile": {
             "is_kyc_compliant": True,
-            "days_remaining": 365,
+            "days_remaining": 90,
             "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
             "last_kyc_date": now.strftime("%Y-%m-%d"),
-            "dynamic_validity_days": 365,
+            "dynamic_validity_days": 90,
         },
     }
 
@@ -287,12 +297,8 @@ async def face_verified_kyc(
     now = datetime.utcnow()
 
     if result["match"]:
-        try:
-            from dateutil.relativedelta import relativedelta
-            expiry = now + relativedelta(years=1)
-        except ImportError:
-            from datetime import timedelta
-            expiry = now + timedelta(days=365)
+        from datetime import timedelta
+        expiry = now + timedelta(days=90)
 
         update = {
             "kyc_complete": True,
@@ -301,10 +307,10 @@ async def face_verified_kyc(
             "kyc_confidence": result["confidence"],
             "kyc_profile": {
                 "is_kyc_compliant": True,
-                "days_remaining": 365,
+                "days_remaining": 90,
                 "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
                 "last_kyc_date": now.strftime("%Y-%m-%d"),
-                "dynamic_validity_days": 365,
+                "dynamic_validity_days": 90,
                 "verification_method": "FACE_RECOGNITION",
                 "confidence_score": result["confidence"],
             },
@@ -417,3 +423,73 @@ async def get_eligible_schemes(user: dict = Depends(require_role("USER"))):
         eligible.append(s)
 
     return {"eligible": eligible, "profile": {"gender": gender, "district": profile.get("district"), "caste": profile.get("caste_category")}}
+
+
+@router.get("/announcements")
+async def get_user_announcements(user: dict = Depends(require_role("USER"))):
+    """Returns published announcements for authenticated users."""
+    try:
+        col = _col("announcements")
+        docs = list(
+            col.find({"published": True}, {"_id": 0})
+            .sort("created_at", -1)
+            .limit(20)
+        )
+        return {"count": len(docs), "announcements": docs}
+    except Exception:
+        return {"count": 0, "announcements": []}
+
+
+@router.patch("/bank")
+async def update_bank_details(
+    body: BankUpdateRequest,
+    user: dict = Depends(require_role("USER")),
+):
+    """Updates only the bank details for the authenticated user."""
+    uid = user["sub"]
+    col = _col("users")
+
+    # Store in the format expected by the frontend
+    update = {
+        "bank": {
+            "bank_name": body.bank_name.strip(),
+            "account_display": body.account_number.strip()[-4:], # Store last 4 for display
+            "full_account_number": body.account_number.strip(),
+            "ifsc": body.ifsc.strip().upper(),
+        }
+    }
+
+    result = col.update_one({"user_id": uid}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(404, "User not found")
+
+    return {"message": "Bank details updated successfully"}
+
+@router.post("/support")
+async def contact_support(
+    body: SupportRequest,
+    user: dict = Depends(require_role("USER")),
+):
+    """Creates a support ticket for the DFO."""
+    uid = user["sub"]
+    db = get_db()
+    
+    # Fetch user details to get the latest district and name
+    user_doc = db["users"].find_one({"user_id": uid})
+    if not user_doc:
+        raise HTTPException(404, "User not found")
+        
+    col = _col("support_tickets")
+    
+    ticket = {
+        "user_id": uid,
+        "user_name": user_doc.get("name"),
+        "district": user_doc.get("district"),
+        "subject": body.subject.strip(),
+        "message": body.message.strip(),
+        "status": "OPEN",
+        "created_at": datetime.utcnow().isoformat()
+    }
+    
+    col.insert_one(ticket)
+    return {"status": "success"}

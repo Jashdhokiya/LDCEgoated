@@ -111,6 +111,42 @@ async def health():
     }
 
 
+@app.get("/api/public/landing-stats")
+async def landing_stats():
+    """Public homepage KPIs derived from DB; safe fallback when DB is unavailable."""
+    try:
+        from database import get_db, is_mongo_available
+        mongo_ok = is_mongo_available()
+        if not mongo_ok:
+            raise RuntimeError("MongoDB unavailable")
+
+        db = get_db()
+        beneficiaries = db["beneficiaries"].count_documents({})
+        flags_count = db["flags"].count_documents({})
+        districts_count = len(db["beneficiaries"].distinct("district", {"district": {"$nin": [None, ""]}}))
+
+        # Sum payment amounts from flags as amount at risk.
+        total_at_risk = 0
+        for f in db["flags"].find({}, {"payment_amount": 1, "_id": 0}):
+            total_at_risk += f.get("payment_amount", 0) or 0
+
+        return {
+            "beneficiaries": beneficiaries,
+            "total_amount_at_risk": total_at_risk,
+            "flags": flags_count,
+            "districts": districts_count,
+            "mongo_connected": True,
+        }
+    except Exception:
+        return {
+            "beneficiaries": 0,
+            "total_amount_at_risk": 0,
+            "flags": 0,
+            "districts": 0,
+            "mongo_connected": False,
+        }
+
+
 @app.get("/")
 async def root():
     return {

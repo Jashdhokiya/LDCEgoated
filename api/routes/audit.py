@@ -32,12 +32,8 @@ def _col(name: str):
 
 
 def _get_flags_from_memory():
-    """Get flags from the in-memory store in analysis.py."""
-    try:
-        from .analysis import _flag_store
-        return list(_flag_store.values())
-    except Exception:
-        return []
+    """Fallback logic for non-Mongo environments — currently returning empty list."""
+    return []
 
 
 def _normalize_for_audit(flag: dict) -> dict:
@@ -225,14 +221,8 @@ async def audit_decide(
             except Exception:
                 pass
 
-    # Also update in-memory flag store
-    try:
-        from .analysis import _flag_store
-        if case_id in _flag_store:
-            _flag_store[case_id]["status"] = "AUDIT_REVIEW"
-            _flag_store[case_id]["audit_report"] = audit_report
-    except Exception:
-        pass
+    # Legacy in-memory update removed
+    pass
 
     return {"case_id": case_id, **update}
 
