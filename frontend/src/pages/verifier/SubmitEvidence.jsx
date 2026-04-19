@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, UploadCloud, MapPin, Camera, CheckCircle, XCircle,
   AlertTriangle, Loader2, FileImage, User, Calendar, Clock,
   Shield, ChevronRight, Check, X, ScanLine
 } from 'lucide-react'
-import exifr from 'exifr'
+// GPS is now captured live via navigator.geolocation (no EXIF needed)
 import { submitEvidence as submitEvidenceAPI } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 
@@ -59,28 +59,28 @@ const ANOMALY_LABELS = {
 }
 
 // ─── Steps ──────────────────────────────────────────────────────────────────
-const STEPS = ['Case Info', 'Upload Photo', 'Field Notes', 'Verify & Submit']
+const STEPS = ['Case Info', 'Capture Photo', 'Field Notes', 'Verify & Submit']
 
 // ─── Verification engine (frontend only) ────────────────────────────────────
 function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate, photoGeoResult, caseData, isRealGps }) {
   const checks = []
 
-  // 1. Photo uploaded
+  // 1. Photo captured
   checks.push({
     id: 'photo',
-    label: 'Photo evidence uploaded',
+    label: 'Photo evidence captured',
     pass: !!photoFile,
-    detail: photoFile ? `${photoFile.name} (${(photoFile.size / 1024).toFixed(0)} KB)` : 'No photo provided',
+    detail: photoFile ? `${photoFile.name} (${(photoFile.size / 1024).toFixed(0)} KB)` : 'No photo captured',
   })
 
-  // 2. GPS geotag present
+  // 2. GPS location captured
   checks.push({
     id: 'gps',
-    label: 'GPS geotag detected in photo',
+    label: 'Live GPS location captured',
     pass: !!(gps?.latitude && gps?.longitude),
     detail: gps?.latitude
       ? `Lat ${gps.latitude.toFixed(5)}, Lng ${gps.longitude.toFixed(5)}`
-      : 'No GPS data found in image EXIF',
+      : 'GPS location not available — enable location services',
   })
 
   // 3. Location within Gujarat
@@ -100,7 +100,7 @@ function verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate, p
   // 4. ★ PHOTO GPS LOCATION MATCH — photo must have been taken at the assigned district
   const assignedDistrict = caseData?.district || ''
   let gpsMatchPassed = false
-  let gpsMatchDetail = 'No GPS data in photo — upload a geotagged photo taken at the assigned location'
+  let gpsMatchDetail = 'No GPS data — capture a photo at the assigned location'
   if (gps?.latitude && photoGeoResult) {
     const districtMatch = locationMatches(photoGeoResult.district, assignedDistrict)
     if (districtMatch) {
@@ -194,60 +194,104 @@ export default function SubmitEvidence() {
   const [submitting, setSubmitting]  = useState(false)
   const [done, setDone]     = useState(false)
   const fileRef = useRef()
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const streamRef = useRef(null)
 
   // Photo GPS reverse geocode result
   const [photoGeoResult, setPhotoGeoResult] = useState(null)
   const [geocoding, setGeocoding] = useState(false)
   const [isRealGps, setIsRealGps] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
+  const [cameraError, setCameraError] = useState('')
+  const [cameraActive, setCameraActive] = useState(false)
+  const [liveGps, setLiveGps] = useState(null)
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [countdown, setCountdown] = useState(null)
 
-  // Fallback: simulate realistic GPS if photo has no EXIF (demo mode)
+  // Fallback: simulate realistic GPS if browser denies location (demo mode)
   const DEMO_GPS = { latitude: 23.0225, longitude: 72.5714 } // Ahmedabad
 
-  const handleFile = useCallback(async (file) => {
-    if (!file || !file.type.startsWith('image/')) return
-    setPhotoFile(file)
-    setPhotoPreview(URL.createObjectURL(file))
-    setExtracting(true)
-    setGps(null)
-    setExifDate(null)
-    setPhotoGeoResult(null)
-
-    // Helper: set GPS + reverse geocode it
-    const applyGps = async (lat, lng) => {
-      setGps({ latitude: lat, longitude: lng })
-      setGeocoding(true)
-      const geo = await reverseGeocode(lat, lng)
-      setPhotoGeoResult(geo)
-      setGeocoding(false)
-    }
-
+  // ── Camera + Live GPS helpers ───────────────────────────────────────────
+  const startCamera = useCallback(async () => {
+    setCameraError('')
+    setCameraActive(true)
+    setCameraReady(false)
     try {
-      const exif = await exifr.parse(file, { gps: true, tiff: true })
-      if (exif?.latitude && exif?.longitude) {
-        setIsRealGps(true)
-        await applyGps(exif.latitude, exif.longitude)
-      } else {
-        // Demo fallback — in real deployment this would stay null
-        setIsRealGps(false)
-        await applyGps(DEMO_GPS.latitude, DEMO_GPS.longitude)
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
+        audio: false,
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.onloadedmetadata = () => setCameraReady(true)
       }
-      if (exif?.DateTimeOriginal) setExifDate(exif.DateTimeOriginal)
-      else setExifDate(new Date()) // demo fallback
     } catch {
-      setIsRealGps(false)
-      await applyGps(DEMO_GPS.latitude, DEMO_GPS.longitude)
-      setExifDate(new Date())
-    } finally {
-      setExtracting(false)
+      setCameraError('Camera access denied. Please allow camera permissions.')
+      setCameraActive(false)
     }
+    // Start fetching GPS in parallel
+    setGpsLoading(true)
+    setLiveGps(null)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { setLiveGps({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }); setGpsLoading(false) },
+        () => { setLiveGps(null); setGpsLoading(false) },
+        { enableHighAccuracy: true, timeout: 15000 }
+      )
+    } else { setGpsLoading(false) }
   }, [])
 
-  const onDrop = (e) => {
-    e.preventDefault()
-    setDragOver(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) handleFile(file)
-  }
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+    setCameraActive(false)
+    setCameraReady(false)
+  }, [])
+
+  // Cleanup camera on unmount
+  useEffect(() => { return () => { streamRef.current?.getTracks().forEach(t => t.stop()) } }, [])
+
+  const doCapture = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d').drawImage(video, 0, 0)
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    // Create a File-like object for verification engine
+    const blob = await (await fetch(dataUrl)).blob()
+    const file = new File([blob], `evidence-${Date.now()}.jpg`, { type: 'image/jpeg' })
+    setPhotoFile(file)
+    setPhotoPreview(dataUrl)
+    setExifDate(new Date())
+    stopCamera()
+    // Apply GPS (live or demo fallback)
+    const usedGps = liveGps || DEMO_GPS
+    setIsRealGps(!!liveGps)
+    setGps({ latitude: usedGps.latitude, longitude: usedGps.longitude })
+    setGeocoding(true)
+    const geo = await reverseGeocode(usedGps.latitude, usedGps.longitude)
+    setPhotoGeoResult(geo)
+    setGeocoding(false)
+  }, [liveGps, stopCamera])
+
+  const handleCaptureWithCountdown = useCallback(() => {
+    setCountdown(3)
+    let c = 3
+    const iv = setInterval(() => {
+      c--
+      if (c <= 0) { clearInterval(iv); setCountdown(null); doCapture() }
+      else setCountdown(c)
+    }, 1000)
+  }, [doCapture])
+
+  const resetCapture = useCallback(() => {
+    setPhotoFile(null); setPhotoPreview(null); setGps(null); setExifDate(null)
+    setPhotoGeoResult(null); setLiveGps(null)
+  }, [])
 
   const runVerification = () => {
     const result = verifyEvidence({ photoFile, gps, notes, beneficiaryPresent, exifDate, photoGeoResult, caseData, isRealGps })
@@ -265,6 +309,9 @@ export default function SubmitEvidence() {
         verifier_notes: notes,
         ai_verification_match: verifyResult?.approved ?? null,
         confidence_score: verifyResult?.score ?? 0,
+        live_gps_lat: liveGps?.latitude || gps?.latitude || 0,
+        live_gps_lng: liveGps?.longitude || gps?.longitude || 0,
+        live_gps_accuracy: liveGps?.accuracy || null,
         reverse_geocode_district: photoGeoResult?.district || null,
         reverse_geocode_taluka: photoGeoResult?.taluka || null,
       })
@@ -278,7 +325,7 @@ export default function SubmitEvidence() {
   }
 
   const canProceedStep0 = true
-  const canProceedStep1 = !!photoFile && !extracting
+  const canProceedStep1 = !!photoFile
   const canProceedStep2 = notes.trim().length >= 30 && beneficiaryPresent !== null && findingCategory
 
   // ── Done screen ──
@@ -380,104 +427,122 @@ export default function SubmitEvidence() {
           </div>
           <div className="px-6 py-4 border-t border-border-subtle">
             <button onClick={() => setStep(1)} className="w-full py-3 bg-primary-override text-white dark:text-shell font-bold rounded-xl text-sm hover:brightness-110 transition-all flex items-center justify-center gap-2">
-              Confirm & Upload Photo <ChevronRight size={16} />
+              Confirm & Capture Photo <ChevronRight size={16} />
             </button>
           </div>
         </div>
       )}
 
-      {/* ── STEP 1: Photo Upload ── */}
+      {/* ── STEP 1: Capture Photo ── */}
       {step === 1 && (
         <div className="space-y-4">
-          {/* Drop zone */}
-          <div
-            onDrop={onDrop}
-            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onClick={() => !photoFile && fileRef.current?.click()}
-            className={`relative rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden
-              ${dragOver ? 'border-primary-override bg-tint-blue' : photoFile ? 'border-emerald-400 bg-tint-emerald' : 'border-border-subtle bg-surface-lowest hover:border-primary-override hover:bg-tint-blue'}`}
-          >
-            <input ref={fileRef} type="file" accept="image/*" className="hidden"
-              onChange={e => handleFile(e.target.files?.[0])} />
+          <canvas ref={canvasRef} className="hidden" />
 
-            {photoPreview ? (
-              <div className="relative">
-                <img src={photoPreview} alt="Evidence" className="w-full max-h-72 object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                  <div className="text-white">
-                    <p className="text-sm font-bold">{photoFile?.name}</p>
-                    <p className="text-xs opacity-70">{(photoFile?.size / 1024).toFixed(0)} KB</p>
+          {/* Camera / Preview area */}
+          {!photoPreview ? (
+            <div className="rounded-2xl border-2 border-dashed border-border-subtle bg-surface-lowest overflow-hidden">
+              {!cameraActive ? (
+                <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+                  <div className="w-14 h-14 rounded-full bg-surface-low flex items-center justify-center mb-4">
+                    <Camera size={26} className="text-text-secondary" />
                   </div>
-                  <button onClick={e => { e.stopPropagation(); setPhotoFile(null); setPhotoPreview(null); setGps(null); setExifDate(null); setPhotoGeoResult(null) }}
-                    className="ml-auto w-8 h-8 rounded-full bg-surface-lowest/20 hover:bg-surface-lowest/30 flex items-center justify-center">
-                    <X size={14} className="text-white" />
+                  <p className="text-sm font-bold text-text-primary mb-1">Capture field evidence photo</p>
+                  <p className="text-xs text-text-secondary font-data mb-4">Your live GPS location will be recorded automatically</p>
+                  <button onClick={startCamera}
+                    className="px-6 py-2.5 bg-primary-override text-white dark:text-shell text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center gap-2">
+                    <Camera size={16} /> Open Camera
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
-                <div className="w-14 h-14 rounded-full bg-surface-low flex items-center justify-center mb-4">
-                  <Camera size={26} className="text-text-secondary" />
-                </div>
-                <p className="text-sm font-bold text-text-primary mb-1">Click to upload or drag & drop</p>
-                <p className="text-xs text-text-secondary font-data">JPEG / PNG · Photo must contain GPS geotag in EXIF</p>
-              </div>
-            )}
-          </div>
-
-          {/* GPS extraction result */}
-          {extracting && (
-            <div className="flex items-center gap-3 p-4 bg-tint-blue rounded-xl border border-border-subtle">
-              <Loader2 size={16} className="animate-spin text-blue-600" />
-              <p className="text-sm text-blue-700 font-data">Extracting GPS data from EXIF metadata…</p>
-            </div>
-          )}
-
-          {!extracting && photoFile && (
-            <div className={`p-4 rounded-xl border ${gps ? 'bg-tint-emerald border-border-subtle' : 'bg-tint-red border-border-subtle'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                {gps ? <CheckCircle size={16} className="text-emerald-600" /> : <XCircle size={16} className="text-red-500" />}
-                <p className={`text-sm font-bold ${gps ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {gps ? 'GPS Geotag Detected' : 'No GPS Data Found'}
-                </p>
-              </div>
-              {gps ? (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-data text-emerald-700">
-                    <MapPin size={11} />
-                    <span className="font-mono">Lat {gps.latitude.toFixed(6)}, Lng {gps.longitude.toFixed(6)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs font-data text-emerald-700">
-                    {isInGujarat(gps.latitude, gps.longitude)
-                      ? <><CheckCircle size={11} /> <span>Within Gujarat jurisdiction</span></>
-                      : <><AlertTriangle size={11} /> <span>Outside Gujarat bounds — will be flagged</span></>
-                    }
-                  </div>
-                  {exifDate && (
-                    <div className="flex items-center gap-2 text-xs font-data text-emerald-700">
-                      <Clock size={11} />
-                      <span>Photo timestamp: {new Date(exifDate).toLocaleString('en-IN')}</span>
+              ) : (
+                <div className="relative">
+                  <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-80 object-cover bg-black" />
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                      <Loader2 size={28} className="animate-spin text-white" />
                     </div>
                   )}
+                  {countdown !== null && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <span className="text-5xl font-bold text-white animate-pulse">{countdown}</span>
+                    </div>
+                  )}
+                  {/* Live GPS indicator overlay */}
+                  <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-black/50 backdrop-blur-sm">
+                    <MapPin size={12} className={liveGps ? 'text-emerald-400' : gpsLoading ? 'text-yellow-400 animate-pulse' : 'text-red-400'} />
+                    <span className="text-xs font-mono text-white">
+                      {liveGps ? `${liveGps.latitude.toFixed(4)}, ${liveGps.longitude.toFixed(4)}` : gpsLoading ? 'Acquiring GPS…' : 'GPS unavailable'}
+                    </span>
+                  </div>
+                  <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/60 to-transparent flex items-center justify-center gap-3">
+                    <button onClick={() => { stopCamera(); setCameraActive(false) }}
+                      className="px-4 py-2 bg-white/20 text-white text-sm font-bold rounded-lg hover:bg-white/30 transition-all">
+                      Cancel
+                    </button>
+                    <button onClick={handleCaptureWithCountdown} disabled={!cameraReady || countdown !== null}
+                      className="px-6 py-2.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-gray-100 transition-all disabled:opacity-50 flex items-center gap-2">
+                      <Camera size={16} /> {countdown !== null ? `${countdown}…` : 'Capture'}
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-xs text-red-600 font-data">
-                  Consider retaking photo with location services enabled. Submission without GPS will be flagged.
-                </p>
               )}
+              {cameraError && (
+                <div className="p-4 bg-tint-red">
+                  <p className="text-xs text-red-600 font-data flex items-center gap-2"><AlertTriangle size={13} />{cameraError}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="relative rounded-2xl border-2 border-emerald-400 bg-tint-emerald overflow-hidden">
+              <img src={photoPreview} alt="Captured evidence" className="w-full max-h-72 object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                <div className="text-white">
+                  <p className="text-sm font-bold">📸 Photo captured</p>
+                  <p className="text-xs opacity-70">{new Date().toLocaleString('en-IN')}</p>
+                </div>
+                <button onClick={resetCapture}
+                  className="ml-auto w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center">
+                  <X size={14} className="text-white" />
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Photo location verification result */}
+          {/* Live GPS verification result */}
+          {photoFile && !geocoding && gps && (
+            <div className={`p-4 rounded-xl border ${gps ? 'bg-tint-emerald border-border-subtle' : 'bg-tint-red border-border-subtle'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle size={16} className="text-emerald-600" />
+                <p className="text-sm font-bold text-emerald-700">{isRealGps ? 'Live GPS Location Captured' : 'Demo GPS Used'}</p>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs font-data text-emerald-700">
+                  <MapPin size={11} />
+                  <span className="font-mono">Lat {gps.latitude.toFixed(6)}, Lng {gps.longitude.toFixed(6)}</span>
+                  {liveGps?.accuracy && <span className="opacity-60">±{liveGps.accuracy.toFixed(0)}m</span>}
+                </div>
+                <div className="flex items-center gap-2 text-xs font-data text-emerald-700">
+                  {isInGujarat(gps.latitude, gps.longitude)
+                    ? <><CheckCircle size={11} /> <span>Within Gujarat jurisdiction</span></>
+                    : <><AlertTriangle size={11} /> <span>Outside Gujarat bounds — will be flagged</span></>
+                  }
+                </div>
+                <div className="flex items-center gap-2 text-xs font-data text-emerald-700">
+                  <Clock size={11} />
+                  <span>Captured: {new Date(exifDate).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Geocode district match */}
           {geocoding && (
             <div className="flex items-center gap-3 p-4 bg-tint-blue rounded-xl border border-border-subtle">
               <Loader2 size={16} className="animate-spin text-blue-600" />
-              <p className="text-sm text-blue-700 font-data">Verifying photo location against assigned district…</p>
+              <p className="text-sm text-blue-700 font-data">Verifying location against assigned district…</p>
             </div>
           )}
 
-          {!extracting && !geocoding && photoFile && gps && photoGeoResult && (
+          {!geocoding && photoFile && gps && photoGeoResult && (
             <div className={`p-4 rounded-xl border ${
               locationMatches(photoGeoResult.district, caseData?.district)
                 ? 'bg-tint-emerald border-emerald-200' : 'bg-tint-red border-red-200'
@@ -491,15 +556,15 @@ export default function SubmitEvidence() {
                   locationMatches(photoGeoResult.district, caseData?.district) ? 'text-emerald-700' : 'text-red-700'
                 }`}>
                   {locationMatches(photoGeoResult.district, caseData?.district)
-                    ? `✓ Photo location matches: ${photoGeoResult.district}`
-                    : `✗ Location mismatch: Photo is from ${photoGeoResult.district || 'unknown'}`
+                    ? `✓ Location verified: ${photoGeoResult.district}`
+                    : `✗ Location mismatch: You are in ${photoGeoResult.district || 'unknown'}`
                   }
                 </p>
               </div>
               <p className="text-xs font-data text-text-secondary ml-6">
                 {locationMatches(photoGeoResult.district, caseData?.district)
-                  ? `Photo taken in ${photoGeoResult.district}${photoGeoResult.taluka ? ' (' + photoGeoResult.taluka + ')' : ''} — matches assigned district (${caseData?.district})`
-                  : `Case is assigned to ${caseData?.district}. This photo was taken in ${photoGeoResult.district || photoGeoResult.state || 'another location'}. Please upload a photo from the correct location.`
+                  ? `You are in ${photoGeoResult.district}${photoGeoResult.taluka ? ' (' + photoGeoResult.taluka + ')' : ''} — matches assigned district (${caseData?.district})`
+                  : `Case is assigned to ${caseData?.district}. Your current location is ${photoGeoResult.district || photoGeoResult.state || 'somewhere else'}. Go to the assigned location to capture evidence.`
                 }
               </p>
             </div>
