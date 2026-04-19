@@ -252,9 +252,11 @@ async def get_schemes(user: dict = Depends(require_role("STATE_ADMIN"))):
     if not result:
         raw = _load_json("scheme_rules.json")
         if isinstance(raw, dict):
-            result = [{"scheme_id": k, **v} for k, v in raw.items()]
+            # Some files include metadata/scalar keys alongside scheme objects.
+            # Only promote dict-like values to scheme documents.
+            result = [{"scheme_id": k, **v} for k, v in raw.items() if isinstance(v, dict)]
         elif isinstance(raw, list) and raw:
-            result = raw
+            result = [s for s in raw if isinstance(s, dict)]
     if not result:
         result = FALLBACK_SCHEMES
     # Normalize all schemes to ensure frontend-required fields exist
