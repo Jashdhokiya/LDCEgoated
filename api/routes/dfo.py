@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/dfo", tags=["dfo"])
 
 def _get_db():
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as e:
         print(f"  [dfo] MongoDB unavailable: {e}")
@@ -152,7 +152,7 @@ async def assign_investigation(
 @router.get("/institutions")
 async def get_institutions(
     flagged_only: bool = False,
-    user: dict = Depends(require_role("DFO")),
+    user: dict = Depends(require_role("DFO", "AUDIT")),
 ):
     """Institutions in the DFO's district only."""
     district = user.get("district")
@@ -163,6 +163,16 @@ async def get_institutions(
     if flagged_only:
         query["risk_profile.is_flagged"] = True
     docs = list(col.find(query, {"_id": 0}))
+    # If DB has no institutions for this district, use fallback data (adapt district)
+    if not docs:
+        import copy
+        fallback = copy.deepcopy(FALLBACK_INSTITUTIONS)
+        if district:
+            for inst in fallback:
+                inst["district"] = district
+        if flagged_only:
+            fallback = [i for i in fallback if i["risk_profile"]["is_flagged"]]
+        return fallback
     return docs
 
 
@@ -200,3 +210,78 @@ async def get_student(beneficiary_id: str, user: dict = Depends(require_role("DF
     if not doc:
         raise HTTPException(404, "Beneficiary not found")
     return doc
+
+@router.get("/support-tickets")
+async def get_support_tickets(user: dict = Depends(require_role("DFO"))):
+    """Retrieves support tickets/complaints from users in the DFO's district."""
+    district = user.get("district")
+    col = _col("support_tickets")
+    
+    # Robust query: Join with users if district is missing in the ticket record
+    pipeline = [
+        {
+            "$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "user_id",
+                "as": "user_info"
+            }
+        },
+        {
+            "$addFields": {
+                "user_name": { "$ifNull": ["$user_name", { "$arrayElemAt": ["$user_info.name", 0] }] },
+                "district": { "$ifNull": ["$district", { "$arrayElemAt": ["$user_info.district", 0] }] }
+            }
+        },
+        {
+            "$match": { 
+                "district": { "$regex": f"^{district}$", "$options": "i" } 
+            } if district else {}
+        },
+        {
+            "$sort": { "created_at": -1 }
+        }
+    ]
+    
+    docs = list(col.aggregate(pipeline))
+    for d in docs:
+        d["_id"] = str(d["_id"])
+        if "user_info" in d: 
+            del d["user_info"]
+    return docs
+
+from bson.objectid import ObjectId
+
+@router.patch("/support-tickets/{ticket_id}")
+async def update_support_ticket(
+    ticket_id: str,
+    body: dict,
+    user: dict = Depends(require_role("DFO"))
+):
+    """Updates a support ticket (e.g., status)."""
+    col = _col("support_tickets")
+    
+    update_data = {}
+    if "status" in body:
+        update_data["status"] = body["status"]
+    
+    if "response" in body:
+        update_data["response"] = body["response"]
+        from datetime import datetime
+        update_data["responded_at"] = datetime.utcnow().isoformat()
+        if "status" not in update_data:
+            update_data["status"] = "RESOLVED" # Auto-resolve on response
+        
+    if not update_data:
+        raise HTTPException(400, "No valid fields to update")
+        
+    try:
+        result = col.update_one(
+            {"_id": ObjectId(ticket_id)},
+            {"$set": update_data}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(404, "Ticket not found")
+        return {"status": "success", "message": "Ticket updated"}
+    except Exception as e:
+        raise HTTPException(400, f"Invalid ticket ID or update failed: {str(e)}")

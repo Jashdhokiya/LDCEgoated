@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 def _get_db():
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as e:
         print(f"  [audit] MongoDB unavailable: {e}")
@@ -32,12 +32,8 @@ def _col(name: str):
 
 
 def _get_flags_from_memory():
-    """Get flags from the in-memory store in analysis.py."""
-    try:
-        from .analysis import _flag_store
-        return list(_flag_store.values())
-    except Exception:
-        return []
+    """Fallback logic for non-Mongo environments — currently returning empty list."""
+    return []
 
 
 def _normalize_for_audit(flag: dict) -> dict:
@@ -225,14 +221,8 @@ async def audit_decide(
             except Exception:
                 pass
 
-    # Also update in-memory flag store
-    try:
-        from .analysis import _flag_store
-        if case_id in _flag_store:
-            _flag_store[case_id]["status"] = "AUDIT_REVIEW"
-            _flag_store[case_id]["audit_report"] = audit_report
-    except Exception:
-        pass
+    # Legacy in-memory update removed
+    pass
 
     return {"case_id": case_id, **update}
 
@@ -279,3 +269,125 @@ async def audit_all(user: dict = Depends(require_role("AUDIT"))):
 
     return {"total": len(unique), "reviewed": unique}
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Institution / Middlemen audit endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InstitutionReportRequest(BaseModel):
+    institution_id:   str
+    institution_name: str
+    report_text:      str
+    risk_summary:     Optional[str] = ""
+    recommendation:   Optional[str] = ""
+    ai_generated:     bool = False
+
+
+@router.get("/institutions")
+async def audit_institutions(user: dict = Depends(require_role("AUDIT"))):
+    """Return institutions in the auditor's district for review."""
+    district = user.get("district")
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    col = db["institutions"]
+    query = {"district": district} if district else {}
+    docs = list(col.find(query, {"_id": 0}))
+    return docs
+
+
+@router.post("/institution-report")
+async def submit_institution_report(
+    body: InstitutionReportRequest,
+    user: dict = Depends(require_role("AUDIT")),
+):
+    """Auditor submits a report on an institution — stored for DFO review."""
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    col = db["institution_reports"]
+
+    report_doc = {
+        "institution_id":   body.institution_id,
+        "institution_name": body.institution_name,
+        "report_text":      body.report_text,
+        "risk_summary":     body.risk_summary,
+        "recommendation":   body.recommendation,
+        "ai_generated":     body.ai_generated,
+        "submitted_by":     user["sub"],
+        "auditor_name":     user.get("name", ""),
+        "district":         user.get("district", ""),
+        "status":           "PENDING_DFO_REVIEW",
+        "submitted_at":     datetime.utcnow().isoformat(),
+        "dfo_decision":     None,
+        "dfo_notes":        None,
+        "dfo_decided_at":   None,
+    }
+    result = col.insert_one(report_doc)
+    report_doc["report_id"] = str(result.inserted_id)
+    report_doc.pop("_id", None)
+    return {"message": "Report submitted for DFO review", "report": report_doc}
+
+
+@router.get("/institution-reports/for-me")
+async def my_institution_reports(user: dict = Depends(require_role("AUDIT"))):
+    """Auditor: list their own submitted institution reports."""
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    col = db["institution_reports"]
+    docs = list(col.find({"submitted_by": user["sub"]}, {"_id": 0}).sort("submitted_at", -1))
+    return {"total": len(docs), "reports": docs}
+
+
+@router.get("/institution-reports/for-dfo")
+async def dfo_institution_reports(user: dict = Depends(require_role("DFO"))):
+    """DFO: all institution reports in their district."""
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    col = db["institution_reports"]
+    district = user.get("district")
+    query = {"district": district} if district else {}
+    raw = list(col.find(query).sort("submitted_at", -1))
+    out = []
+    for d in raw:
+        d["report_id"] = str(d.pop("_id"))
+        out.append(d)
+    return {"total": len(out), "reports": out}
+
+
+@router.post("/institution-report/{report_id}/decide")
+async def dfo_decide_report(
+    report_id: str,
+    body: dict,
+    user: dict = Depends(require_role("DFO")),
+):
+    """DFO verifies or rejects an institution audit report."""
+    decision = body.get("decision")
+    notes = body.get("notes", "")
+    if decision not in {"VERIFIED", "REJECTED", "REASSIGN"}:
+        raise HTTPException(400, "decision must be VERIFIED, REJECTED, or REASSIGN")
+
+    db = _get_db()
+    if db is None:
+        raise HTTPException(503, "Database unavailable")
+    col = db["institution_reports"]
+
+    from bson import ObjectId
+    try:
+        oid = ObjectId(report_id)
+    except Exception:
+        raise HTTPException(400, "Invalid report_id")
+
+    update = {
+        "dfo_decision":   decision,
+        "dfo_notes":      notes,
+        "dfo_decided_by": user["sub"],
+        "dfo_decided_at": datetime.utcnow().isoformat(),
+        "status":         f"DFO_{decision}",
+    }
+    result = col.update_one({"_id": oid}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(404, "Report not found")
+    return {"report_id": report_id, **update}

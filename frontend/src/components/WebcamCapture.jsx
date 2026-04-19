@@ -102,7 +102,7 @@ export default function WebcamCapture({ onCapture, onCancel, mode = 'enroll', di
       ) : !captured ? (
         <>
           {/* Live Camera Feed */}
-          <div className="relative w-64 h-64 rounded-2xl overflow-hidden bg-gray-900 mb-4">
+          <div className="relative w-64 h-64 rounded-2xl overflow-hidden bg-shell mb-4">
             <video
               ref={videoRef}
               autoPlay
@@ -113,7 +113,7 @@ export default function WebcamCapture({ onCapture, onCancel, mode = 'enroll', di
             />
 
             {!cameraReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+              <div className="absolute inset-0 flex items-center justify-center bg-shell">
                 <Loader2 size={28} className="animate-spin text-text-secondary" />
               </div>
             )}

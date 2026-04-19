@@ -108,7 +108,7 @@ export default function AssignCaseModal({ caseId, caseName, onClose, onAssigned 
               <button
                 onClick={handleAssign}
                 disabled={!selected || loading}
-                className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-lg hover:brightness-110 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-primary-override text-white dark:text-shell text-sm font-bold rounded-lg hover:brightness-110 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />}
                 {loading ? t('assignModal.assigning') : t('middlemen.assign')}

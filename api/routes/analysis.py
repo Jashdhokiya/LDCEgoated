@@ -24,9 +24,6 @@ from ..deps import require_role
 
 router = APIRouter(tags=["analysis"])
 
-# In-memory fallback flag store (used by audit.py and admin.py when DB is down)
-_flag_store: dict = {}
-
 
 def _load_detectors():
     from detectors.cross_scheme_detector import detect_cross_scheme
@@ -40,7 +37,7 @@ def _load_detectors():
 
 def _get_db():
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as e:
         print(f"  [analysis] MongoDB unavailable: {e}")
@@ -146,11 +143,6 @@ async def run_analysis(body: dict, user: dict = Depends(require_role("DFO", "STA
     if enriched:
         col.insert_many([{k: v for k, v in f.items() if k != "_id"} for f in enriched])
 
-    # Populate in-memory fallback store
-    _flag_store.clear()
-    for f in enriched:
-        _flag_store[f["flag_id"]] = f
-
     elapsed = time.time() - start
 
     # Return only district-scoped flags to the requesting officer
@@ -196,6 +188,7 @@ async def get_flag(flag_id: str, user: dict = Depends(require_role("DFO", "STATE
 async def generate_flag_evidence(flag_id: str,
                                   user: dict = Depends(require_role("DFO", "STATE_ADMIN", "AUDIT"))):
     """Generate AI evidence for a single flag and persist it."""
+    print(f"DEBUG: Generating evidence for flag {flag_id}")
     # Retrieve the flag
     flag = None
     col = _col("flags")
@@ -205,14 +198,12 @@ async def generate_flag_evidence(flag_id: str,
         except Exception:
             pass
     if flag is None:
-        flag = _flag_store.get(flag_id)
-    if flag is None:
         raise HTTPException(404, "Flag not found")
 
     # Generate evidence
     try:
         from ai_layer.evidence_generator import generate_evidence
-        evidence = generate_evidence(flag, label="CRITICAL")   # force AI path
+        evidence = generate_evidence(flag, detailed=True)   # deep-dive mode
         source = "ai"
     except Exception:
         evidence = _fallback_evidence(flag)
@@ -224,8 +215,7 @@ async def generate_flag_evidence(flag_id: str,
             col.update_one({"flag_id": flag_id}, {"$set": {"evidence": evidence}})
         except Exception:
             pass
-    if flag_id in _flag_store:
-        _flag_store[flag_id]["evidence"] = evidence
+
 
     return {"evidence": evidence, "source": source}
 

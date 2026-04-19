@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def _get_db():
     """Returns the MongoDB db object or None."""
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as exc:
         raise HTTPException(

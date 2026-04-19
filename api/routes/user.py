@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/user", tags=["user"])
 
 def _get_db():
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database unavailable: {e}")
@@ -76,9 +76,11 @@ class ProfileCompletionRequest(BaseModel):
     dob: str                       # YYYY-MM-DD
     caste_category: str            # GENERAL | OBC | SC | ST | EWS
     income: Optional[float] = None # annual family income
+    address: Optional[str] = None  # full home address
     bank_name: Optional[str] = None
-    bank_account_display: Optional[str] = None  # last 4 digits
+    bank_account_display: Optional[str] = None  # full account number (masked on display)
     bank_ifsc: Optional[str] = None
+    aadhaar_verified: bool = False  # set True when Aadhaar OTP was verified
     face_photo: Optional[str] = None  # base64-encoded selfie for face ID
 
 
@@ -88,6 +90,16 @@ class FaceKYCRequest(BaseModel):
 
 class FaceUploadRequest(BaseModel):
     face_photo: str  # base64-encoded selfie
+
+
+class BankUpdateRequest(BaseModel):
+    bank_name: str
+    account_number: str
+    ifsc: str
+
+class SupportRequest(BaseModel):
+    subject: str
+    message: str
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -192,51 +204,45 @@ async def complete_profile(
         raise HTTPException(status_code=400, detail="Face photo is mandatory for identity verification.")
 
     face_enrolled = False
-    secure_url = body.face_photo
-    try:
-        from ..face_verify import detect_face_in_image, upload_face
-        result = detect_face_in_image(body.face_photo)
-        if not result["face_detected"]:
-            raise HTTPException(400, "No face detected in the photo. Please take a clear selfie.")
-        
-        # Upload to Cloudinary if available
-        secure_url = upload_face(body.face_photo)
-        face_enrolled = True
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.warning(f"Face detection or upload failed (non-critical): {e}")
-        # Allow enrollment even if pipeline fails, to unblock
-        face_enrolled = True
+    secure_url = None
+    if body.face_photo:
+        try:
+            from ..face_verify import detect_face_in_image, upload_face
+            result = detect_face_in_image(body.face_photo)
+            if not result["face_detected"]:
+                raise HTTPException(400, "No face detected in the photo. Please take a clear selfie.")
+            secure_url = upload_face(body.face_photo)
+            face_enrolled = True
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.warning(f"Face detection or upload failed (non-critical): {e}")
+            secure_url = body.face_photo
+            face_enrolled = True
 
     update = {
-        "phone":          body.phone.strip(),
-        "district":       body.district.strip(),
-        "taluka":         body.taluka.strip(),
-        "gender":         body.gender.strip().upper(),
-        "dob":            body.dob.strip(),
-        "caste_category": body.caste_category.strip().upper(),
-        "income":         body.income,
+        "phone":            body.phone.strip(),
+        "district":         body.district.strip(),
+        "taluka":           body.taluka.strip(),
+        "gender":           body.gender.strip().upper(),
+        "dob":              body.dob.strip(),
+        "caste_category":   body.caste_category.strip().upper(),
+        "income":           body.income,
+        "address":          body.address or "",
+        "aadhaar_verified": body.aadhaar_verified,
         "bank": {
-            "bank_name":        body.bank_name or "",
-            "account_display":  body.bank_account_display or "",
-            "ifsc":             body.bank_ifsc or "",
+            "bank_name":       body.bank_name or "",
+            "account_display": body.bank_account_display or "",
+            "ifsc":            (body.bank_ifsc or "").upper(),
         },
-        "profile_complete": True,
+        "profile_complete":     True,
         "profile_completed_at": datetime.utcnow().isoformat(),
     }
 
-    # Upload to Cloudinary
-    try:
-        from ..face_verify import upload_face
-        secure_url = upload_face(body.face_photo)
-    except Exception as e:
-        logger.warning(f"Upload face failed: {e}")
-        secure_url = body.face_photo
-
-    update["face_reference"] = secure_url
-    update["face_enrolled"] = True
-    update["face_enrolled_at"] = datetime.utcnow().isoformat()
+    if face_enrolled and secure_url:
+        update["face_reference"]   = secure_url
+        update["face_enrolled"]    = True
+        update["face_enrolled_at"] = datetime.utcnow().isoformat()
 
     col.update_one({"user_id": uid}, {"$set": update})
     updated = col.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0, "face_reference": 0})
@@ -267,18 +273,18 @@ async def complete_kyc(user: dict = Depends(require_role("USER"))):
         raise HTTPException(400, "Complete your profile first")
 
     now = datetime.utcnow()
-    from dateutil.relativedelta import relativedelta
-    expiry = now + relativedelta(years=1)
+    from datetime import timedelta
+    expiry = now + timedelta(days=90)
 
     update = {
         "kyc_complete": True,
         "kyc_completed_at": now.isoformat(),
         "kyc_profile": {
             "is_kyc_compliant": True,
-            "days_remaining": 365,
+            "days_remaining": 90,
             "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
             "last_kyc_date": now.strftime("%Y-%m-%d"),
-            "dynamic_validity_days": 365,
+            "dynamic_validity_days": 90,
         },
     }
 
@@ -320,12 +326,8 @@ async def face_verified_kyc(
     now = datetime.utcnow()
 
     if result["match"]:
-        try:
-            from dateutil.relativedelta import relativedelta
-            expiry = now + relativedelta(years=1)
-        except ImportError:
-            from datetime import timedelta
-            expiry = now + timedelta(days=365)
+        from datetime import timedelta
+        expiry = now + timedelta(days=90)
 
         update = {
             "kyc_complete": True,
@@ -334,10 +336,10 @@ async def face_verified_kyc(
             "kyc_confidence": result["confidence"],
             "kyc_profile": {
                 "is_kyc_compliant": True,
-                "days_remaining": 365,
+                "days_remaining": 90,
                 "kyc_expiry_date": expiry.strftime("%Y-%m-%d"),
                 "last_kyc_date": now.strftime("%Y-%m-%d"),
-                "dynamic_validity_days": 365,
+                "dynamic_validity_days": 90,
                 "verification_method": "FACE_RECOGNITION",
                 "confidence_score": result["confidence"],
             },

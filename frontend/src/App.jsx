@@ -9,24 +9,28 @@ import Login from './pages/Login'
 import Dashboard from './pages/dfo/Dashboard'
 import InvestigationQueue from './pages/dfo/InvestigationQueue'
 import CaseDetail from './pages/dfo/CaseDetail'
-import Heatmap from './pages/dfo/Heatmap'
+import PublicComplaints from './pages/dfo/PublicComplaints'
 import AuditReport from './pages/dfo/AuditReport'
 import MiddlemenList from './pages/dfo/MiddlemenList'
 import FlaggedInstitutions from './pages/dfo/FlaggedInstitutions'
+import InstitutionReports from './pages/dfo/InstitutionReports'
 
 // State Admin
 import GujaratHeatmap from './pages/admin/GujaratHeatmap'
 import RulesEngine from './pages/admin/RulesEngine'
 import DistrictOverview from './pages/admin/DistrictOverview'
+import Announcements from './pages/admin/Announcements'
 
 // General User
 import UserDashboard from './pages/user/UserDashboard'
+import UserProfile from './pages/user/UserProfile'
 import CompleteProfile from './pages/user/CompleteProfile'
 import VerifyEmail from './pages/user/VerifyEmail'
 
 // Audit Officer
 import AuditOfficerDashboard from './pages/audit/AuditOfficerDashboard'
 import AuditVerifierQueue from './pages/audit/AuditVerifierQueue'
+import AuditMiddlemen from './pages/audit/AuditMiddlemen'
 
 // Scheme Verifier
 import SchemeVerifierDashboard from './pages/verifier/SchemeVerifierDashboard'
@@ -64,7 +68,7 @@ function PublicRoute({ children }) {
 function ProtectedLayout() {
   const { role, officer, logout, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!role) return <Navigate to="/login" replace />
+  if (!role) return <Navigate to="/" replace />
 
   // If USER and profile not complete, force profile completion
   if (role === 'USER' && !officer?.profile_complete) {
@@ -85,7 +89,7 @@ function ProtectedLayout() {
 function ProfileCompletionGuard({ children }) {
   const { role, officer, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!role) return <Navigate to="/login" replace />
+  if (!role) return <Navigate to="/" replace />
   // If profile is already complete, go to dashboard
   if (role === 'USER' && officer?.profile_complete) {
     return <Navigate to="/user/dashboard" replace />
@@ -117,20 +121,22 @@ export default function App() {
         <Route path="/dfo/dashboard" element={<Dashboard />} />
         <Route path="/dfo/queue" element={<InvestigationQueue />} />
         <Route path="/dfo/case/:flagId" element={<CaseDetail />} />
-        <Route path="/dfo/heatmap" element={<Heatmap />} />
+        <Route path="/dfo/complaints" element={<PublicComplaints />} />
         <Route path="/dfo/report" element={<AuditReport />} />
-        <Route path="/dfo/middlemen" element={<MiddlemenList />} />
         <Route path="/dfo/flagged-institutions" element={<FlaggedInstitutions />} />
+        <Route path="/dfo/institution-reports" element={<InstitutionReports />} />
 
         {/* State Admin */}
         <Route path="/admin/gujarat-map" element={<GujaratHeatmap />} />
         <Route path="/admin/rules-engine" element={<RulesEngine />} />
         <Route path="/admin/district-overview" element={<DistrictOverview />} />
+        <Route path="/admin/announcements" element={<Announcements />} />
 
         {/* Audit Officer */}
         <Route path="/audit/overview" element={<AuditOfficerDashboard />} />
         <Route path="/audit/report" element={<AuditReport />} />
         <Route path="/audit/verifier-queue" element={<AuditVerifierQueue />} />
+        <Route path="/audit/middlemen" element={<AuditMiddlemen />} />
 
         {/* Scheme Verifier */}
         <Route path="/verifier/my-cases" element={<SchemeVerifierDashboard />} />
@@ -139,6 +145,7 @@ export default function App() {
 
         {/* General User */}
         <Route path="/user/dashboard" element={<UserDashboard />} />
+        <Route path="/user/profile" element={<UserProfile />} />
       </Route>
 
       {/* Catch-all → landing */}

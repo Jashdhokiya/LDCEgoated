@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/verifier", tags=["verifier"])
 
 def _get_db():
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as e:
         print(f"  [verifier] MongoDB unavailable: {e}")
@@ -71,6 +71,11 @@ class EvidenceSubmission(BaseModel):
     verifier_notes:     str
     ai_verification_match: Optional[bool]   = None
     confidence_score:   Optional[float]     = None
+    live_gps_lat:       Optional[float]     = None
+    live_gps_lng:       Optional[float]     = None
+    live_gps_accuracy:  Optional[float]     = None
+    reverse_geocode_district: Optional[str] = None
+    reverse_geocode_taluka:   Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -124,26 +129,102 @@ async def get_case(case_id: str, user: dict = Depends(require_role("SCHEME_VERIF
     return _normalize_for_verifier(doc)
 
 
+def _reverse_geocode_server(lat: float, lng: float) -> dict:
+    """Server-side reverse geocoding via Nominatim (free, no API key)."""
+    import requests
+    try:
+        res = requests.get(
+            f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json&addressdetails=1&zoom=12",
+            headers={"Accept-Language": "en", "User-Agent": "EduGuard-DBT/1.0"},
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return {}
+        data = res.json()
+        addr = data.get("address", {})
+        return {
+            "display": data.get("display_name", ""),
+            "district": addr.get("state_district") or addr.get("county", ""),
+            "taluka": addr.get("suburb") or addr.get("town") or addr.get("village") or addr.get("city", ""),
+            "state": addr.get("state", ""),
+        }
+    except Exception:
+        return {}
+
+
+def _location_matches(geo_name: str, assigned_name: str) -> bool:
+    """Fuzzy match for location names (handles transliteration variations)."""
+    if not geo_name or not assigned_name:
+        return False
+    import re
+    a = re.sub(r"[^a-z]", "", geo_name.lower())
+    b = re.sub(r"[^a-z]", "", assigned_name.lower())
+    if a == b:
+        return True
+    if a in b or b in a:
+        return True
+    # 3-char prefix match
+    if len(a) >= 3 and len(b) >= 3 and a[:3] == b[:3]:
+        return True
+    return False
+
+
 @router.post("/evidence/{case_id}")
 async def submit_evidence(
     case_id: str,
     body: EvidenceSubmission,
     user: dict = Depends(require_role("SCHEME_VERIFIER")),
 ):
-    """Submit GPS-tagged field evidence for a case."""
+    """Submit GPS-tagged field evidence for a case with location verification."""
     col = _col("flags")
 
-    # Verify case exists (don't require assignment for flexibility)
+    # Verify case exists
     doc = col.find_one(
         {"$or": [{"case_id": case_id}, {"flag_id": case_id}]},
         {"_id": 0}
     )
+
+    case_district = (doc or {}).get("district", "")
+
+    # ── Server-side GPS verification ──────────────────────────────────────────
+    gps_verification = {
+        "live_gps": None,
+        "reverse_geocode": None,
+        "district_match": False,
+        "verified": False,
+    }
+
+    check_lat = body.live_gps_lat or body.gps_lat
+    check_lng = body.live_gps_lng or body.gps_lng
+
+    if check_lat and check_lng:
+        gps_verification["live_gps"] = {
+            "lat": check_lat,
+            "lng": check_lng,
+            "accuracy_meters": body.live_gps_accuracy,
+        }
+
+        # Server-side reverse geocode (independent of frontend)
+        geo = _reverse_geocode_server(check_lat, check_lng)
+        if geo:
+            gps_verification["reverse_geocode"] = geo
+            gps_verification["district_match"] = _location_matches(
+                geo.get("district", ""), case_district
+            )
+            gps_verification["verified"] = gps_verification["district_match"]
+
+        # Cross-check with frontend-reported values
+        if body.reverse_geocode_district:
+            gps_verification["frontend_reported_district"] = body.reverse_geocode_district
+            gps_verification["frontend_reported_taluka"] = body.reverse_geocode_taluka
+    # ──────────────────────────────────────────────────────────────────────────
 
     field_report = {
         "photo_evidence_url":    body.photo_evidence_url,
         "gps_coordinates":       {"lat": body.gps_lat, "lng": body.gps_lng},
         "verifier_notes":        body.verifier_notes,
         "ai_verification_match": body.ai_verification_match,
+        "gps_verification":      gps_verification,
         "ai_analysis": {
             "confidence_score": body.confidence_score or 0,
             "reason":           "AI analysis pending" if body.ai_verification_match is None else (
@@ -152,6 +233,8 @@ async def submit_evidence(
             ),
             "proofs": [
                 f"GPS coordinates verified: ({body.gps_lat:.5f}, {body.gps_lng:.5f})",
+                f"Live GPS: ({check_lat:.5f}, {check_lng:.5f})" if check_lat else "No live GPS",
+                f"Location match: {'PASSED' if gps_verification['verified'] else 'FAILED'} — {gps_verification.get('reverse_geocode', {}).get('district', 'unknown')} vs {case_district}",
                 f"Evidence submitted by verifier {user.get('name', user['sub'])}",
                 f"Submission timestamp: {datetime.utcnow().isoformat()}",
             ],
@@ -173,4 +256,10 @@ async def submit_evidence(
     if result.matched_count == 0:
         raise HTTPException(404, f"Case {case_id} not found in database")
 
-    return {"case_id": case_id, "status": "VERIFICATION_SUBMITTED", "field_report": field_report}
+    return {
+        "case_id": case_id,
+        "status": "VERIFICATION_SUBMITTED",
+        "gps_verification": gps_verification,
+        "field_report": field_report,
+    }
+

@@ -53,7 +53,7 @@ export default function AuditOfficerDashboard() {
         </div>
         <button 
           onClick={handleForwardToDFO}
-          className="flex items-center gap-2 px-6 py-2.5 bg-primary-override text-white rounded-sm text-sm font-bold shadow-md hover:brightness-110 transition-colors"
+          className="flex items-center gap-2 px-6 py-2.5 bg-primary-override text-white dark:text-shell rounded-sm text-sm font-bold shadow-md hover:brightness-110 transition-colors"
         >
           <Send size={16} /> {t('auditOfficer.forwardReports')}
         </button>
@@ -96,7 +96,7 @@ export default function AuditOfficerDashboard() {
                 </div>
                 <button 
                   onClick={() => setSelectedCase(c)}
-                  className="px-4 py-2 border border-primary-override text-primary-override text-xs font-bold rounded hover:bg-primary-override hover:text-white transition-colors"
+                  className="px-4 py-2 border border-primary-override text-primary-override text-xs font-bold rounded hover:bg-primary-override hover:text-white dark:text-shell transition-colors"
                 >
                   {t('auditOfficer.reviewReport')}
                 </button>

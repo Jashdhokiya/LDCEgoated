@@ -28,7 +28,7 @@ def get_current_user(
         )
 
     try:
-        from database import get_db
+        from .database import get_db
 
         db = get_db()
         if db is None:

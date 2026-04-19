@@ -42,8 +42,12 @@ export default function DistrictOverview() {
   const filtered = uniqueDistricts
     .filter(d => d.district.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
-      const va = a[sortKey] ?? 0, vb = b[sortKey] ?? 0
-      return sortDir === 'desc' ? vb - va : va - vb
+      const va = a[sortKey]
+      const vb = b[sortKey]
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sortDir === 'desc' ? vb.localeCompare(va) : va.localeCompare(vb)
+      }
+      return sortDir === 'desc' ? (vb ?? 0) - (va ?? 0) : (va ?? 0) - (vb ?? 0)
     })
 
   const maxFlags = Math.max(...uniqueDistricts.map(d => d.total_flags))

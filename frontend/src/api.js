@@ -155,6 +155,16 @@ export async function getHealth() {
   return safe(() => client.get('/api/health'), { status: 'unknown' })
 }
 
+export async function getLandingStats() {
+  return safe(() => client.get('/api/public/landing-stats'), {
+    beneficiaries: 0,
+    total_amount_at_risk: 0,
+    flags: 0,
+    districts: 0,
+    mongo_connected: false,
+  })
+}
+
 // ── ANALYSIS (DFO / Admin / Audit) ───────────────────────────────────────────
 
 export async function runAnalysis(runId = 'demo-001') {
@@ -209,6 +219,14 @@ export async function getVerifiers() {
   return safe(() => client.get('/api/dfo/verifiers'), [])
 }
 
+export async function getSupportTickets() {
+  return safe(() => client.get('/api/dfo/support-tickets'), [])
+}
+
+export async function updateSupportTicket(ticketId, data) {
+  return safe(() => client.patch(`/api/dfo/support-tickets/${ticketId}`, data), null)
+}
+
 export async function getStudents(params = {}) {
   return safe(() => client.get('/api/dfo/students', { params }), { total: 0, students: [] })
 }
@@ -237,6 +255,14 @@ export async function updateScheme(schemeId, payload) {
 
 export async function getOfficers() {
   return safe(() => client.get('/api/admin/officers'), [])
+}
+
+export async function getAdminAnnouncements() {
+  return safe(() => client.get('/api/admin/announcements'), [])
+}
+
+export async function createAdminAnnouncement(payload) {
+  return safe(() => client.post('/api/admin/announcements', payload), null)
 }
 
 // ── SCHEME VERIFIER ───────────────────────────────────────────────────────────
@@ -274,6 +300,27 @@ export async function getAuditHistory() {
   return safe(() => client.get('/api/audit/all'), { total: 0, reviewed: [] })
 }
 
+export async function getAuditInstitutions() {
+  // Uses the DFO institutions endpoint (now also accessible to AUDIT role)
+  return safe(() => client.get('/api/dfo/institutions'), [])
+}
+
+export async function submitInstitutionReport(payload) {
+  return safe(() => client.post('/api/audit/institution-report', payload), null)
+}
+
+export async function getMyInstitutionReports() {
+  return safe(() => client.get('/api/audit/institution-reports/for-me'), { total: 0, reports: [] })
+}
+
+export async function getDFOInstitutionReports() {
+  return safe(() => client.get('/api/audit/institution-reports/for-dfo'), { total: 0, reports: [] })
+}
+
+export async function decideDFOReport(reportId, decision, notes = '') {
+  return safe(() => client.post(`/api/audit/institution-report/${reportId}/decide`, { decision, notes }), null)
+}
+
 // ── USER ──────────────────────────────────────────────────────────────────────
 
 export async function getUser() {
@@ -282,6 +329,11 @@ export async function getUser() {
 
 export async function completeProfile(profileData) {
   const res = await client.put('/api/user/complete-profile', profileData)
+  return res.data
+}
+
+export async function updateBank(bankData) {
+  const res = await client.patch('/api/user/bank', bankData)
   return res.data
 }
 
@@ -330,6 +382,34 @@ export async function renewKYC() {
   return completeKYC()
 }
 
+// ── AADHAAR VERIFICATION ──────────────────────────────────────────────────────
+
+export async function aadhaarSendOTP(aadhaarNumber) {
+  const res = await client.post('/api/aadhaar/send-otp', { aadhaar_number: aadhaarNumber })
+  return res.data
+}
+
+export async function aadhaarVerifyOTP(transactionId, otp) {
+  const res = await client.post('/api/aadhaar/verify-otp', { transaction_id: transactionId, otp })
+  return res.data
+}
+
+export async function aadhaarApiStatus() {
+  return safe(() => client.get('/api/aadhaar/status'), { configured: false, demo_aadhaar: '999999990019', demo_otp: '123456' })
+}
+
+// ── IFSC LOOKUP (Razorpay public API — no auth needed) ────────────────────────
+
+export async function lookupIFSC(ifsc) {
+  try {
+    const res = await fetch(`https://ifsc.razorpay.com/${ifsc.toUpperCase()}`)
+    if (!res.ok) return null
+    return res.json()  // { BANK, BRANCH, ADDRESS, CITY, DISTRICT, STATE, CONTACT, IFSC }
+  } catch {
+    return null
+  }
+}
+
 // ── Legacy compatibility ──────────────────────────────────────────────────────
 
 export const api = {
@@ -337,7 +417,7 @@ export const api = {
   getFlags:        () => client.get('/api/flags'),
   getFlag:         (id) => client.get(`/api/flag/${id}`),
   updateFlagStatus:(id, status) => client.patch(`/api/flag/${id}/status`, { status }),
-  generateEvidence:(id) => client.post(`/api/flag/${id}/generate-evidence`),
+  generateEvidence:(id) => client.post(`/api/flag/${id}/generate-evidence`, {}, { timeout: 60000 }),
   getStats:        () => client.get('/api/stats'),
   getReport:       () => client.get('/api/report'),
 }

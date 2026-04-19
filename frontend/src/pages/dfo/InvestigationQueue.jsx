@@ -69,7 +69,7 @@ export default function InvestigationQueue() {
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 text-xs font-bold rounded-lg border transition-all ${
               activeTab === tab.key
-                ? 'bg-primary-override text-white border-primary-override'
+                ? 'bg-primary-override text-white dark:text-shell border-primary-override'
                 : 'bg-surface-lowest text-text-secondary border-border-subtle hover:border-primary-override'
             }`}
           >

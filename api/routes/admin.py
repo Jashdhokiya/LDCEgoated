@@ -9,7 +9,9 @@ GET   /api/admin/officers         — list all officers
 """
 import json
 import os
+import uuid
 from collections import defaultdict
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -32,7 +34,7 @@ def _load_json(filename: str, default=None):
 
 def _get_db():
     try:
-        from database import get_db
+        from ..database import get_db
         return get_db()
     except Exception as e:
         print(f"  [admin] MongoDB unavailable: {e}")
@@ -97,6 +99,8 @@ FALLBACK_SCHEMES = [
     },
 ]
 
+_ANNOUNCEMENTS_MEMORY = []
+
 # Default field values used to fill in schemes that are missing frontend-required fields
 _SCHEME_DEFAULTS = {s["scheme_id"]: s for s in FALLBACK_SCHEMES}
 
@@ -125,12 +129,8 @@ def _normalize_scheme(scheme: dict) -> dict:
 
 
 def _get_flags_from_memory():
-    """Get flags from the in-memory store in analysis.py."""
-    try:
-        from .analysis import _flag_store
-        return list(_flag_store.values())
-    except Exception:
-        return []
+    """Fallback logic for non-Mongo environments — currently returning empty list."""
+    return []
 
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
@@ -139,6 +139,12 @@ class SchemeUpdateBody(BaseModel):
     status:              Optional[str]  = None
     eligibility_rules:   Optional[dict] = None
     mutual_exclusions:   Optional[list] = None
+
+
+class AnnouncementCreateBody(BaseModel):
+    title: str
+    body: str
+    tag: Optional[str] = "UPDATE"  # NEW | UPDATE | REMINDER
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -303,3 +309,59 @@ async def list_officers(user: dict = Depends(require_role("STATE_ADMIN"))):
         except Exception:
             pass
     return [{k: v for k, v in o.items() if k != "plain_password"} for o in DEMO_OFFICERS]
+
+
+@router.get("/announcements")
+async def list_announcements(user: dict = Depends(require_role("STATE_ADMIN"))):
+    """State admin: list all announcements (latest first)."""
+    col = _col("announcements")
+    if col is not None:
+        try:
+            docs = list(col.find({}, {"_id": 0}).sort("created_at", -1))
+            return docs
+        except Exception:
+            pass
+    return sorted(_ANNOUNCEMENTS_MEMORY, key=lambda x: x.get("created_at", ""), reverse=True)
+
+
+@router.post("/announcements")
+async def create_announcement(
+    body: AnnouncementCreateBody,
+    user: dict = Depends(require_role("STATE_ADMIN")),
+):
+    """State admin: push a new announcement for users."""
+    title = body.title.strip()
+    content = body.body.strip()
+    if not title:
+        raise HTTPException(400, "title is required")
+    if not content:
+        raise HTTPException(400, "body is required")
+
+    tag = (body.tag or "UPDATE").strip().upper()
+    if tag not in {"NEW", "UPDATE", "REMINDER"}:
+        raise HTTPException(400, "tag must be one of NEW, UPDATE, REMINDER")
+
+    announcement = {
+        "announcement_id": f"ANN-{uuid.uuid4().hex[:10].upper()}",
+        "title": title,
+        "body": content,
+        "tag": tag,
+        "created_at": datetime.utcnow().isoformat(),
+        "published": True,
+        "created_by": {
+            "id": user.get("sub"),
+            "name": user.get("name"),
+        },
+    }
+
+    col = _col("announcements")
+    if col is not None:
+        try:
+            col.insert_one(announcement)
+            announcement.pop("_id", None)
+            return announcement
+        except Exception:
+            pass
+
+    _ANNOUNCEMENTS_MEMORY.append(announcement)
+    return announcement

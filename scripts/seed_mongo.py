@@ -229,28 +229,27 @@ for district in GUJARAT_GEOGRAPHY:
         "active_cases": 0,
     })
 
-# Scheme Verifier — one per taluka
+# Scheme Verifier — 2-3 per taluka
 for district, talukas in GUJARAT_GEOGRAPHY.items():
     for taluka in talukas:
-        officer_counter += 1
-        pw = taluka.lower().replace(" ", "").replace("-", "") + "@123"
-        all_officers.append({
-            "officer_id": f"SV-{taluka[:3].upper()}-{officer_counter:04d}",
-            "name": _rand_name(),
-            "role": "SCHEME_VERIFIER",
-            "email": f"sv.{taluka.lower().replace(' ', '')}.{district.lower().replace(' ', '')}@eduguard.in",
-            "district": district,
-            "taluka": taluka,
-            "password_hash": hash_pw(pw),
-            "is_active": True,
-            "active_cases": random.randint(0, 5),
-        })
+        for _ in range(random.randint(2, 3)):
+            officer_counter += 1
+            pw = taluka.lower().replace(" ", "").replace("-", "") + "@123"
+            all_officers.append({
+                "officer_id": f"SV-{taluka[:3].upper()}-{officer_counter:04d}",
+                "name": _rand_name(),
+                "role": "SCHEME_VERIFIER",
+                "email": f"sv.{taluka.lower().replace(' ', '')}.{district.lower().replace(' ', '')}@eduguard.in",
+                "district": district,
+                "taluka": taluka,
+                "password_hash": hash_pw(pw),
+                "is_active": True,
+                "active_cases": random.randint(0, 5),
+            })
 
-# Audit Officer — 1-3 per district, assigned to specific talukas
+# Audit Officer — 1 per taluka
 for district, talukas in GUJARAT_GEOGRAPHY.items():
-    num_audit = min(3, max(1, len(talukas) // 3))
-    audit_talukas = talukas[:num_audit]
-    for taluka in audit_talukas:
+    for taluka in talukas:
         officer_counter += 1
         pw = taluka.lower().replace(" ", "").replace("-", "") + "@123"
         all_officers.append({
