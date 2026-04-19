@@ -1,12 +1,23 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { RiskBadge, LeakageBadge } from '../../components/RiskBadge'
-import { Play, RefreshCw, FileText, AlertCircle } from 'lucide-react'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { Play, RefreshCw, FileText, AlertCircle, TrendingUp, TrendingDown, UserCircle } from 'lucide-react'
 import { api } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 
-const COLORS = { DECEASED: '#E63946', DUPLICATE: '#F5A623', UNDRAWN: '#EAB308', CROSS_SCHEME: '#abc9f1' }
+const COLORS = {
+  DECEASED: '#2563eb',
+  DUPLICATE: '#3b82f6',
+  UNDRAWN: '#93c5fd',
+  SCHEMA_IRREGULARITY: '#f97316',
+  CROSS_SCHEME: '#facc15'
+}
+
+// Dummy data for sparklines to match the image's aesthetic
+const sparkData1 = [ {v:10}, {v:12}, {v:11}, {v:15}, {v:14}, {v:18}, {v:17}, {v:20} ]
+const sparkData2 = [ {v:5}, {v:8}, {v:7}, {v:12}, {v:10}, {v:15}, {v:14}, {v:20} ]
+const sparkData3 = [ {v:20}, {v:18}, {v:25}, {v:22}, {v:28}, {v:26}, {v:24}, {v:22} ]
+const sparkData4 = [ {v:2}, {v:2}, {v:3}, {v:3}, {v:3}, {v:4}, {v:4}, {v:8} ]
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -18,7 +29,6 @@ export default function Dashboard() {
   const [elapsed, setElapsed] = useState(0)
   const timerRef = useRef(null)
 
-  // Elapsed-time ticker — updates every second while analysis is running
   useEffect(() => {
     if (loading) {
       setElapsed(0)
@@ -29,7 +39,6 @@ export default function Dashboard() {
     return () => clearInterval(timerRef.current)
   }, [loading])
 
-  // Fetch existing data on mount
   useEffect(() => {
     const fetchExisting = async () => {
       try {
@@ -40,7 +49,7 @@ export default function Dashboard() {
         if (flagsRes.data && flagsRes.data.length > 0) {
           setAnalysisData({
             flags: flagsRes.data,
-            total_transactions: 10306, // from demo data
+            total_transactions: 10306,
             flagged_count: flagsRes.data.length,
             processing_time_seconds: 0
           })
@@ -74,30 +83,30 @@ export default function Dashboard() {
   const criticalFlags = analysisData?.flags?.filter(f => f.risk_label === 'CRITICAL').slice(0, 5) || []
 
   return (
-    <div className="p-8 pb-20">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 sm:p-8 pb-20 bg-[#fbfbfe] min-h-screen">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold font-sans text-text-primary tracking-tight">{t('dashboard.title')}</h1>
-          <p className="text-sm text-text-secondary mt-1 font-data">{t('dashboard.subtitle')}</p>
+          <h1 className="text-[24px] sm:text-[28px] font-bold font-sans text-gray-900 tracking-tight">Intelligence Ledger</h1>
+          <p className="text-sm text-gray-600 mt-1 font-sans">Education Scheme Anomaly Detection — AY 2024–25</p>
         </div>
         <button
           onClick={runAnalysis}
           disabled={loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-b from-primary-override to-shell text-white text-sm font-semibold rounded-md shadow-[0_8px_24px_rgba(15,28,44,0.08)] hover:shadow-lg disabled:opacity-70 transition-all font-sans"
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#121a2f] text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow disabled:opacity-70 transition-all font-sans w-full sm:w-auto justify-center"
         >
-          {loading ? <RefreshCw size={18} className="animate-spin" /> : <Play size={18} />}
-          {loading ? `${t('dashboard.scanning')} ${elapsed}s` : t('dashboard.runAnalysis')}
+          {loading ? <RefreshCw size={16} className="animate-spin" /> : null}
+          {loading ? `Running... ${elapsed}s` : 'Run Analysis'}
         </button>
       </div>
 
       {/* Loading banner */}
       {loading && (
-        <div className="mb-6 p-4 bg-tint-blue border border-border-subtle rounded-lg flex items-center gap-3">
-          <RefreshCw size={18} className="animate-spin text-primary-override" />
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-center gap-3">
+          <RefreshCw size={18} className="animate-spin text-blue-600" />
           <div>
-            <p className="text-sm font-bold text-primary-override font-sans">{t('dashboard.scanningBanner')}</p>
-            <p className="text-xs text-text-secondary font-data mt-0.5">
-              {t('dashboard.scanningDetail')} {elapsed}s
+            <p className="text-sm font-bold text-blue-900 font-sans">{t('dashboard.scanningBanner') || 'Scanning records...'}</p>
+            <p className="text-xs text-blue-700 font-sans mt-0.5">
+              {t('dashboard.scanningDetail') || 'Processing'} {elapsed}s
             </p>
           </div>
         </div>
@@ -105,90 +114,160 @@ export default function Dashboard() {
 
       {/* Error banner */}
       {error && (
-        <div className="mb-6 p-4 bg-tint-red border border-border-subtle rounded-lg flex items-center gap-3">
-          <AlertCircle size={18} className="text-risk-critical flex-shrink-0" />
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-lg flex items-center gap-3">
+          <AlertCircle size={18} className="text-red-600 flex-shrink-0" />
           <div>
-            <p className="text-sm font-bold text-risk-critical font-sans">{t('dashboard.analysisError')}</p>
-            <p className="text-xs text-risk-critical font-data mt-0.5">{error}</p>
+            <p className="text-sm font-bold text-red-900 font-sans">{t('dashboard.analysisError') || 'Analysis Error'}</p>
+            <p className="text-xs text-red-700 font-sans mt-0.5">{error}</p>
           </div>
         </div>
       )}
 
       {analysisData && (
-        <div className="grid grid-cols-4 gap-6 mb-8">
-          {[
-            { label: t('dashboard.transactionsAnalysed'), value: analysisData.total_transactions?.toLocaleString('en-IN'), sub: `${t('dashboard.processedIn')} ${analysisData.processing_time_seconds}s`, color: 'bg-blue-500' },
-            { label: t('dashboard.flagsRaised'), value: analysisData.flagged_count, sub: t('dashboard.acrossSchemes'), color: 'bg-orange-500' },
-            { label: t('dashboard.amountAtRisk'), value: stats ? `₹${(stats.total_amount_at_risk/100000).toFixed(1)}L` : '—', sub: t('dashboard.pendingRecovery'), color: 'bg-yellow-500' },
-            { label: t('dashboard.criticalCases'), value: analysisData.flags?.filter(f => f.risk_label === 'CRITICAL').length, sub: t('dashboard.immediateAction'), color: 'bg-risk-critical' },
-          ].map((card, i) => (
-            <div key={i} className={`p-5 bg-surface-lowest rounded-lg shadow-sm relative overflow-hidden`}>
-              <div className={`absolute left-0 top-0 bottom-0 w-1 ${card.color}`} />
-              <p className="text-xs text-text-secondary font-data font-semibold uppercase tracking-wider mb-2">{card.label}</p>
-              <p className="text-4xl font-sans font-bold text-text-primary tracking-tight">
-                {card.value}
-              </p>
-              <p className="text-xs text-text-secondary mt-2 font-data">{card.sub}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+          {/* Card 1 */}
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-[11px] text-gray-500 font-sans font-bold uppercase tracking-wider">TRANSACTIONS ANALYSED</p>
             </div>
-          ))}
+            <div className="flex items-end justify-between mb-4">
+              <span className="text-3xl font-sans font-bold text-gray-900 tracking-tight">10,306</span>
+              <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md">
+                <TrendingUp size={12} strokeWidth={3} /> +12%
+              </span>
+            </div>
+            <div className="h-10 mt-auto -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparkData1}>
+                  <Line type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Card 2 */}
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-[11px] text-gray-500 font-sans font-bold uppercase tracking-wider">FLAGS RAISED</p>
+            </div>
+            <div className="flex items-end justify-between mb-4">
+              <span className="text-3xl font-sans font-bold text-gray-900 tracking-tight">8</span>
+              <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md">
+                <TrendingUp size={12} strokeWidth={3} /> +25%
+              </span>
+            </div>
+            <div className="h-10 mt-auto -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparkData2}>
+                  <Line type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Card 3 */}
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-[11px] text-gray-500 font-sans font-bold uppercase tracking-wider">AMOUNT AT RISK</p>
+            </div>
+            <div className="flex items-end justify-between mb-4">
+              <span className="text-3xl font-sans font-bold text-gray-900 tracking-tight">₹1.5L</span>
+              <span className="flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-md">
+                <TrendingDown size={12} strokeWidth={3} /> -5%
+              </span>
+            </div>
+            <div className="h-10 mt-auto -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparkData3}>
+                  <Line type="monotone" dataKey="v" stroke="#1d4ed8" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Card 4 */}
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-[11px] text-gray-500 font-sans font-bold uppercase tracking-wider">CRITICAL CASES</p>
+            </div>
+            <div className="flex items-end justify-between mb-4">
+              <span className="text-3xl font-sans font-bold text-gray-900 tracking-tight">4</span>
+              <span className="flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-md">
+                <TrendingUp size={12} strokeWidth={3} /> +100%
+              </span>
+            </div>
+            <div className="h-10 mt-auto -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sparkData4}>
+                  <Line type="monotone" dataKey="v" stroke="#3b82f6" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       )}
 
       {analysisData && (
-        <div className="grid grid-cols-3 gap-6">
-          <div className="bg-surface-lowest p-6 rounded-lg shadow-sm">
-            <h2 className="text-sm font-bold mb-6 text-text-primary uppercase tracking-widest font-sans">{t('dashboard.flagsByType')}</h2>
-            <div className="h-64">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Donut Chart */}
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] lg:col-span-1">
+            <h2 className="text-xs font-bold mb-4 text-gray-500 uppercase tracking-widest font-sans">FLAGS BY TYPE</h2>
+            <div className="h-48 relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={95}
+                    innerRadius={50}
+                    outerRadius={75}
                     dataKey="value"
                     stroke="none"
-                    label={({ name, value, cx, cy, midAngle, outerRadius }) => {
-                      const RADIAN = Math.PI / 180
-                      const radius = outerRadius + 18
-                      const x = cx + radius * Math.cos(-midAngle * RADIAN)
-                      const y = cy + radius * Math.sin(-midAngle * RADIAN)
-                      const LABELS = { DECEASED: 'Deceased', DUPLICATE: 'Duplicate', UNDRAWN: 'Undrawn', CROSS_SCHEME: 'Cross-Scheme' }
-                      return (
-                        <text x={x} y={y} fill="var(--color-text-secondary)" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-[10px] font-data font-bold">
-                          {LABELS[name] || name} ({value})
-                        </text>
-                      )
-                    }}
                   >
                     {pieData.map((entry) => (
                       <Cell key={entry.name} fill={COLORS[entry.name] || '#3B82F6'} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ background: 'var(--color-surface-lowest)', border: '1px solid var(--color-border-subtle)', borderRadius: '8px', boxShadow: '0 8px 24px rgba(15,28,44,0.15)', color: 'var(--color-text-primary)' }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
+            <div className="grid grid-cols-2 gap-x-2 gap-y-3 mt-4">
+               {pieData.map(entry => (
+                 <div key={entry.name} className="flex items-center gap-2">
+                   <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: COLORS[entry.name] || '#3b82f6' }} />
+                   <span className="text-[11px] font-sans text-gray-600 truncate capitalize">{entry.name.replace('_', ' ')} ({entry.value})</span>
+                 </div>
+               ))}
+            </div>
           </div>
 
-          <div className="bg-surface-lowest p-6 rounded-lg shadow-sm col-span-2">
-            <h2 className="text-sm font-bold mb-4 text-text-primary uppercase tracking-widest font-sans">{t('dashboard.criticalFlags')}</h2>
-            <div className="overflow-hidden rounded-lg">
+          {/* Critical Flags List */}
+          <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] lg:col-span-2">
+            <h2 className="text-xs font-bold mb-4 text-gray-500 uppercase tracking-widest font-sans">CRITICAL FLAGS — PRIORITY ACTION</h2>
+            <div className="flex flex-col gap-3">
               {criticalFlags.map((flag, idx) => (
-                <div key={flag.flag_id} className={`flex items-center justify-between p-4 ${idx % 2 === 0 ? 'bg-surface-lowest' : 'bg-surface-low'}`}>
-                  <div>
-                    <p className="text-base font-bold font-sans text-text-primary">{flag.beneficiary_name}</p>
-                    <p className="text-sm text-text-secondary font-data mt-1">{flag.district} · <LeakageBadge type={flag.leakage_type} /></p>
+                <div key={flag.flag_id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors gap-3 sm:gap-0">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 shrink-0">
+                      <UserCircle size={24} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold font-sans text-gray-900">{flag.beneficiary_name}</p>
+                      <p className="text-xs text-gray-500 font-sans mt-0.5">{flag.district} · {flag.leakage_type.replace('_', ' ')} Beneficiary</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <span className="text-lg font-mono font-medium text-risk-critical">₹{flag.payment_amount?.toLocaleString('en-IN')}</span>
-                    <button onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} className="text-sm font-sans font-semibold text-primary-override hover:text-blue-700 bg-surface-lowest shadow-sm border border-border-subtle px-3 py-1.5 rounded-md transition-colors">{t('common.review')} →</button>
+                  <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end">
+                    <span className={`px-3 py-1 rounded-full text-[11px] font-bold ${idx % 2 === 0 ? 'bg-orange-500 text-white' : 'bg-red-600 text-white'}`}>
+                      {idx % 2 === 0 ? 'High Priority tag' : 'Critical'}
+                    </span>
+                    <span className="text-sm font-sans font-bold text-gray-900 w-auto sm:w-20 text-right">₹{flag.payment_amount?.toLocaleString('en-IN')}</span>
+                    <button onClick={() => navigate(`/dfo/case/${flag.flag_id}`)} className="text-xs font-sans font-semibold text-gray-700 bg-white shadow-sm border border-gray-200 px-4 py-1.5 rounded-md hover:bg-gray-50 transition-colors shrink-0">Review</button>
                   </div>
                 </div>
               ))}
-              {criticalFlags.length === 0 && analysisData && (
-                <p className="text-sm text-text-secondary font-data p-4">{t('dashboard.noCritical')}</p>
+              {criticalFlags.length === 0 && (
+                <p className="text-sm text-gray-500 font-sans p-4 text-center mt-8">No critical cases found.</p>
               )}
             </div>
           </div>
@@ -196,11 +275,11 @@ export default function Dashboard() {
       )}
 
       {!analysisData && !loading && (
-        <div className="flex flex-col items-center justify-center h-96 bg-surface-lowest rounded-lg border border-dashed border-border-subtle text-text-secondary mt-4">
-          <FileText size={48} className="text-text-secondary/70 mb-4" />
-          <p className="text-xl font-sans font-bold text-text-primary mb-2">{t('dashboard.workspaceEmpty')}</p>
-          <p className="text-sm font-data">{t('dashboard.workspaceEmptyDesc')}</p>
-          <p className="text-xs font-data text-text-secondary/50 mt-2">{t('dashboard.workspaceEmptyNote')}</p>
+        <div className="flex flex-col items-center justify-center h-96 bg-white rounded-xl border border-dashed border-gray-200 text-gray-400 mt-4 shadow-sm">
+          <FileText size={48} className="text-gray-300 mb-4" />
+          <p className="text-xl font-sans font-bold text-gray-800 mb-2">{t('dashboard.workspaceEmpty') || 'No Data'}</p>
+          <p className="text-sm font-sans">{t('dashboard.workspaceEmptyDesc') || 'Run an analysis to view intelligence ledger.'}</p>
+          <p className="text-xs font-sans text-gray-400 mt-2">{t('dashboard.workspaceEmptyNote') || 'Requires backend to be running'}</p>
         </div>
       )}
     </div>

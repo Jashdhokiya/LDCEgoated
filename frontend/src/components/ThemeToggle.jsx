@@ -29,10 +29,9 @@ export default function ThemeToggle({ variant = 'sidebar' }) {
       <button
         onClick={toggle}
         aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-        className="flex items-center gap-2 px-3 py-2 text-xs rounded-md border border-transparent
-          text-white/65 hover:text-white hover:bg-surface-lowest/20 hover:border-border-subtle font-data w-full transition-all"
+        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-white/65 hover:text-white hover:bg-white/5 rounded-lg transition-all font-sans"
       >
-        {dark ? <Sun size={14} /> : <Moon size={14} />}
+        {dark ? <Sun size={18} /> : <Moon size={18} />}
         {dark ? 'Light mode' : 'Dark mode'}
       </button>
     )

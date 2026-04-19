@@ -147,6 +147,16 @@ export async function getHealth() {
   return safe(() => client.get('/api/health'), { status: 'unknown' })
 }
 
+export async function getLandingStats() {
+  return safe(() => client.get('/api/public/landing-stats'), {
+    beneficiaries: 0,
+    total_amount_at_risk: 0,
+    flags: 0,
+    districts: 0,
+    mongo_connected: false,
+  })
+}
+
 // ── ANALYSIS (DFO / Admin / Audit) ───────────────────────────────────────────
 
 export async function runAnalysis(runId = 'demo-001') {
@@ -201,6 +211,10 @@ export async function getVerifiers() {
   return safe(() => client.get('/api/dfo/verifiers'), [])
 }
 
+export async function getSupportTickets() {
+  return safe(() => client.get('/api/dfo/support-tickets'), [])
+}
+
 export async function getStudents(params = {}) {
   return safe(() => client.get('/api/dfo/students', { params }), { total: 0, students: [] })
 }
@@ -229,6 +243,14 @@ export async function updateScheme(schemeId, payload) {
 
 export async function getOfficers() {
   return safe(() => client.get('/api/admin/officers'), [])
+}
+
+export async function getAdminAnnouncements() {
+  return safe(() => client.get('/api/admin/announcements'), [])
+}
+
+export async function createAdminAnnouncement(payload) {
+  return safe(() => client.post('/api/admin/announcements', payload), null)
 }
 
 // ── SCHEME VERIFIER ───────────────────────────────────────────────────────────
@@ -298,6 +320,11 @@ export async function completeProfile(profileData) {
   return res.data
 }
 
+export async function updateBank(bankData) {
+  const res = await client.patch('/api/user/bank', bankData)
+  return res.data
+}
+
 export async function completeKYC() {
   const res = await client.post('/api/user/kyc')
   return res.data
@@ -323,6 +350,14 @@ export async function getUserPayments() {
 
 export async function getEligibleSchemes() {
   return safe(() => client.get('/api/user/eligible-schemes'), { eligible: [] })
+}
+
+export async function getUserAnnouncements() {
+  return safe(() => client.get('/api/user/announcements'), { count: 0, announcements: [] })
+}
+
+export async function contactSupport(payload) {
+  return safe(() => client.post('/api/user/support', payload), null)
 }
 
 export async function renewKYC() {
@@ -364,7 +399,7 @@ export const api = {
   getFlags:        () => client.get('/api/flags'),
   getFlag:         (id) => client.get(`/api/flag/${id}`),
   updateFlagStatus:(id, status) => client.patch(`/api/flag/${id}/status`, { status }),
-  generateEvidence:(id) => client.post(`/api/flag/${id}/generate-evidence`),
+  generateEvidence:(id) => client.post(`/api/flag/${id}/generate-evidence`, {}, { timeout: 60000 }),
   getStats:        () => client.get('/api/stats'),
   getReport:       () => client.get('/api/report'),
 }

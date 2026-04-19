@@ -12,7 +12,10 @@ def _get_client():
     global _client
     if _client is None:
         from groq import Groq
-        _client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        _client = Groq(
+            api_key=os.getenv("GROQ_API_KEY"),
+            timeout=45.0,
+        )
     return _client
 
 SCHEME_NAMES = {
@@ -33,40 +36,47 @@ Rules:
 - Do NOT use bullet points. Write as connected sentences.
 - End with the single most important implication (e.g., "Payment must be recovered", "Identity verification required").
 """
+DETAILED_INVESTIGATIVE_PROMPT = """You are a senior forensic investigator for the Gujarat State Audit Department. 
+Your task is to generate a high-impact Intelligence Report for a flagged DBT transaction.
 
-def generate_evidence(flag: dict, label: str = None) -> str:
+Structure your response as exactly 3-4 highly detailed, bulleted investigative findings.
+Each finding must start with a bold category (e.g. **Discrepancy Detected**, **Data Correlation**, **Policy Violation**).
+
+Rules:
+- Be extremely specific: mention specific dates, ID numbers, and currency amounts.
+- Highlight the exact conflict between two or more data sources (e.g., U-DISE vs. Bank Ledger).
+- Use professional, punchy investigative language.
+- Mention specific departmental circulars or policy thresholds if applicable.
+- The tone should be authoritative and ready for legal or administrative action.
+"""
+
+def generate_evidence(flag: dict, label: str = None, detailed: bool = False) -> str:
     """
     Generate AI evidence string for a single flag.
-    Only uses Groq for CRITICAL flags to prevent rate limiting and timeouts.
-    Falls back to template if API fails or for non-critical flags.
+    Only uses Groq for CRITICAL flags or if 'detailed' is requested.
     """
-    if label != "CRITICAL":
+    if label != "CRITICAL" and not detailed:
         return _template_evidence(flag)
 
     lt = flag["leakage_type"]
-    ed = flag["evidence_data"]
-    name = flag["beneficiary_name"]
-    district = flag["district"]
-    scheme = SCHEME_NAMES.get(flag["scheme"], flag["scheme"])
-    amount = flag.get("payment_amount", 0)
-    payment_date = flag.get("payment_date", "unknown date")
+    system_prompt = DETAILED_INVESTIGATIVE_PROMPT if detailed else EVIDENCE_SYSTEM_PROMPT
     
     # Build a structured prompt with all relevant facts
     facts = _build_facts_string(flag)
     
-    prompt = f"""Write an evidence citation for this flagged DBT transaction:
+    prompt = f"""Generate a { 'detailed Intelligence Report' if detailed else 'short evidence citation'} for this flagged transaction:
 
 LEAKAGE TYPE: {lt}
 {facts}
 
-Write the evidence in 2–3 sentences as described."""
+Provide the findings as described in your system instructions."""
     
     try:
         response = _get_client().chat.completions.create(
             model=GROQ_MODEL,
-            max_tokens=200,
+            max_tokens=500 if detailed else 200,
             messages=[
-                {"role": "system", "content": EVIDENCE_SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ]
         )
