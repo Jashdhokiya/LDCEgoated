@@ -176,7 +176,7 @@ export default function PublicComplaints() {
               <div className="md:w-48 flex flex-col justify-center gap-3">
                 <button 
                   onClick={() => handleRespond(complaint)}
-                  className="w-full py-2.5 bg-primary-override text-white text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-primary-override text-white dark:text-shell text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
                 >
                   <ChevronRight size={14} />
                   Respond
@@ -200,7 +200,7 @@ export default function PublicComplaints() {
       {/* Response Modal */}
       {respondComplaint && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-surface-lowest w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-border-subtle flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-text-primary">Respond to Citizen</h3>
@@ -222,21 +222,21 @@ export default function PublicComplaints() {
                 value={responseText}
                 onChange={(e) => setResponseText(e.target.value)}
                 placeholder="Type your response here. This will be visible to the citizen and will automatically resolve the ticket."
-                className="w-full h-32 p-3 rounded-xl border border-border-subtle bg-surface-low focus:bg-white focus:ring-2 focus:ring-primary-override/20 focus:border-primary-override transition-all outline-none resize-none text-sm"
+                className="w-full h-32 p-3 rounded-xl border border-border-subtle bg-surface-low focus:bg-surface-lowest focus:ring-2 focus:ring-primary-override/20 focus:border-primary-override transition-all outline-none resize-none text-sm"
               />
             </div>
             
             <div className="p-4 border-t border-border-subtle bg-surface-low flex justify-end gap-3">
               <button
                 onClick={() => setRespondComplaint(null)}
-                className="px-5 py-2.5 text-sm font-semibold text-text-secondary hover:bg-white rounded-xl transition-colors border border-transparent hover:border-border-subtle"
+                className="px-5 py-2.5 text-sm font-semibold text-text-secondary hover:bg-surface-lowest rounded-xl transition-colors border border-transparent hover:border-border-subtle"
               >
                 Cancel
               </button>
               <button
                 onClick={submitResponse}
                 disabled={isSending || !responseText.trim()}
-                className="px-5 py-2.5 text-sm font-bold text-white bg-primary-override rounded-xl hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-bold text-white dark:text-shell bg-primary-override rounded-xl hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 {isSending ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
                 Send & Resolve

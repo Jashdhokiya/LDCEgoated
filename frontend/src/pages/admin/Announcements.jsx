@@ -115,7 +115,7 @@ export default function Announcements() {
         <button
           type="submit"
           disabled={saving}
-          className="px-5 py-2.5 rounded-lg bg-primary-override text-white font-bold text-sm hover:brightness-110 transition flex items-center gap-2 disabled:opacity-60"
+          className="px-5 py-2.5 rounded-lg bg-primary-override text-white dark:text-shell font-bold text-sm hover:brightness-110 transition flex items-center gap-2 disabled:opacity-60"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           Publish Announcement

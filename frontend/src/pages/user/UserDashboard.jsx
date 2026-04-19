@@ -78,7 +78,7 @@ function KYCModal({ user, onClose, onComplete }) {
             <div key={s} className="flex items-center flex-1">
               <div className="w-full flex flex-col items-center">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 transition-all ${
-                  step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-primary-override text-white' : 'bg-surface-low text-text-secondary'
+                  step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-primary-override text-white dark:text-shell' : 'bg-surface-low text-text-secondary'
                 }`}>{step > i + 1 ? <Check size={14} /> : i + 1}</div>
                 <span className={`text-[10px] font-data ${step === i + 1 ? 'text-primary-override font-bold' : 'text-text-secondary'}`}>{s}</span>
               </div>
@@ -112,7 +112,7 @@ function KYCModal({ user, onClose, onComplete }) {
               <button onClick={onClose} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-low transition-all">{t('common.cancel')}</button>
               <button 
                 onClick={() => setStep(2)} 
-                className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-primary-override text-white dark:text-shell text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
               >
                 <Camera size={14} /> {hasFaceRef ? 'Verify Face' : 'Enroll Face ID'}
               </button>
@@ -298,7 +298,7 @@ function BankUpdateModal({ user, onClose, onUpdate }) {
             <button 
               type="submit"
               disabled={loading}
-              className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 bg-primary-override text-white dark:text-shell text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : 'Update Bank'}
             </button>
@@ -723,7 +723,7 @@ export default function UserDashboard() {
                           <div key={s.id} className="flex flex-col items-center w-1/4 relative">
                             <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 z-10 transition-colors ${
                               stepState === 'completed' ? 'bg-emerald-500 text-white' :
-                              stepState === 'current' ? 'bg-primary-override text-white ring-4 ring-tint-blue' :
+                              stepState === 'current' ? 'bg-primary-override text-white dark:text-shell ring-4 ring-tint-blue' :
                               'bg-surface-lowest border-4 border-border-subtle text-transparent'
                             }`}>
                               {stepState === 'completed' && <Check size={24} strokeWidth={3} />}

@@ -303,7 +303,7 @@ export default function CompleteProfile() {
                 <div className="flex flex-col items-center">
                   <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-sm ${
                     done ? 'bg-emerald-600 text-white' :
-                    active ? 'bg-primary-override text-white ring-4 ring-primary-override/20' :
+                    active ? 'bg-primary-override text-white dark:text-shell ring-4 ring-primary-override/20' :
                     'bg-surface-low text-text-secondary'
                   }`}>
                     {done ? <CheckCircle size={17} /> : <Icon size={15} />}

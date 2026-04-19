@@ -41,7 +41,7 @@ export default function LanguageToggle({ variant = 'sidebar' }) {
           onClick={() => setLang(p.id)}
           className={`px-3 py-1.5 text-xs font-bold transition-all ${
             lang === p.id
-              ? 'bg-primary-override text-white dark:bg-[#dbe8f6] dark:text-[#08111d]'
+              ? 'bg-primary-override text-white dark:text-shell dark:bg-[#dbe8f6] dark:text-[#08111d]'
               : 'text-text-secondary hover:text-text-primary hover:bg-surface-lowest dark:text-[#d7e0ec] dark:hover:bg-white/10 dark:hover:text-white'
           }`}
         >

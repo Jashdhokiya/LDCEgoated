@@ -303,7 +303,7 @@ export default function SubmitEvidence() {
             <p className="text-xs font-data text-text-secondary">The Audit Officer will review discrepancies before final decision.</p>
           </div>
         )}
-        <button onClick={onComplete} className="px-8 py-3 bg-primary-override text-white font-bold rounded-xl text-sm hover:brightness-110 transition-all">
+        <button onClick={onComplete} className="px-8 py-3 bg-primary-override text-white dark:text-shell font-bold rounded-xl text-sm hover:brightness-110 transition-all">
           Back to My Cases
         </button>
       </div>
@@ -334,7 +334,7 @@ export default function SubmitEvidence() {
             <div className="flex flex-col items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                 step > i ? 'bg-emerald-500 text-white' :
-                step === i ? 'bg-primary-override text-white' :
+                step === i ? 'bg-primary-override text-white dark:text-shell' :
                 'bg-surface-low text-text-secondary'
               }`}>
                 {step > i ? <Check size={14} /> : i + 1}
@@ -379,7 +379,7 @@ export default function SubmitEvidence() {
             </p>
           </div>
           <div className="px-6 py-4 border-t border-border-subtle">
-            <button onClick={() => setStep(1)} className="w-full py-3 bg-primary-override text-white font-bold rounded-xl text-sm hover:brightness-110 transition-all flex items-center justify-center gap-2">
+            <button onClick={() => setStep(1)} className="w-full py-3 bg-primary-override text-white dark:text-shell font-bold rounded-xl text-sm hover:brightness-110 transition-all flex items-center justify-center gap-2">
               Confirm & Upload Photo <ChevronRight size={16} />
             </button>
           </div>
@@ -510,7 +510,7 @@ export default function SubmitEvidence() {
               ← {t('common.cancel')}
             </button>
             <button onClick={() => setStep(2)} disabled={!canProceedStep1}
-              className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+              className="flex-1 py-2.5 bg-primary-override text-white dark:text-shell text-sm font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               Continue to Field Notes <ChevronRight size={16} />
             </button>
           </div>
@@ -590,7 +590,7 @@ export default function SubmitEvidence() {
               ← {t('common.cancel')}
             </button>
             <button onClick={runVerification} disabled={!canProceedStep2}
-              className="flex-1 py-2.5 bg-primary-override text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+              className="flex-1 py-2.5 bg-primary-override text-white dark:text-shell text-sm font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-40 flex items-center justify-center gap-2">
               <ScanLine size={16} /> Run Verification Check
             </button>
           </div>

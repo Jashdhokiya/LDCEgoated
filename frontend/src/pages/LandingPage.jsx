@@ -159,7 +159,7 @@ export default function LandingPage() {
           <ThemeToggle variant="navbar" />
           <button
             onClick={() => navigate('/login')}
-            className="landing-button flex items-center gap-2 px-5 py-2.5 bg-primary-override hover:brightness-110 text-white text-sm font-semibold rounded transition"
+            className="landing-button flex items-center gap-2 px-5 py-2.5 bg-primary-override hover:brightness-110 text-white dark:text-shell text-sm font-semibold rounded transition"
           >
             {t('landing.accessPortal')} <ArrowRight size={16} />
           </button>
@@ -207,7 +207,7 @@ export default function LandingPage() {
             <div className="flex items-center justify-center gap-4">
             <button
               onClick={() => navigate('/login')}
-              className="landing-button flex items-center gap-2 px-8 py-3.5 bg-primary-override hover:brightness-110 text-white font-semibold rounded transition text-base shadow-sm hover:shadow-md"
+              className="landing-button flex items-center gap-2 px-8 py-3.5 bg-primary-override hover:brightness-110 text-white dark:text-shell font-semibold rounded transition text-base shadow-sm hover:shadow-md"
             >
               {t('landing.loginToDashboard')} <ArrowRight size={18} />
             </button>

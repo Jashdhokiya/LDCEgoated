@@ -52,8 +52,8 @@ function RiskGauge({ score, label }) {
         />
       </svg>
       <div className="absolute bottom-4 flex flex-col items-center">
-        <span className="text-3xl font-bold text-slate-800 tracking-tight">{score}</span>
-        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Risk Score / 100</span>
+        <span className="text-3xl font-bold text-text-primary tracking-tight">{score}</span>
+        <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest mt-0.5">Risk Score / 100</span>
       </div>
     </div>
   )
@@ -178,16 +178,16 @@ export default function CaseDetail() {
   }
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-surface-low gap-4">
       <Loader2 size={40} className="animate-spin text-primary-override" />
-      <span className="text-slate-500 font-medium">{t('caseDetail.loadingCase')}</span>
+      <span className="text-text-secondary font-medium">{t('caseDetail.loadingCase')}</span>
     </div>
   )
   
   if (!flag) return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-surface-low gap-4">
       <ShieldAlert size={48} className="text-red-500" />
-      <span className="text-slate-600 font-bold text-xl">{t('caseDetail.caseNotFound')}</span>
+      <span className="text-text-secondary font-bold text-xl">{t('caseDetail.caseNotFound')}</span>
       <button onClick={() => navigate('/dfo/queue')} className="text-primary-override font-bold hover:underline">Back to Queue</button>
     </div>
   )
@@ -202,20 +202,20 @@ export default function CaseDetail() {
     : ["No specific evidence points generated yet. Use AI layer for analysis."]
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pb-12">
+    <div className="min-h-screen bg-surface-low/50 pb-12">
       {/* --- Breadcrumb/Header --- */}
-      <div className="bg-white border-b border-slate-200 px-8 py-4 sticky top-0 z-10">
+      <div className="bg-surface-lowest border-b border-border-subtle px-8 py-4 sticky top-0 z-10">
         <div className="max-w-[1400px] mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/dfo/queue')}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500"
+              className="p-2 hover:bg-surface rounded-lg transition-colors text-text-secondary"
             >
               <ArrowLeft size={20} />
             </button>
-            <h1 className="text-lg font-bold text-slate-800">EduGuard Case Management</h1>
+            <h1 className="text-lg font-bold text-text-primary">EduGuard Case Management</h1>
           </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-widest">
+          <div className="flex items-center gap-2 text-xs font-bold text-text-secondary uppercase tracking-widest">
             <span>District Dashboard</span>
             <ChevronRight size={12} />
             <span className="text-primary-override">Case Detail</span>
@@ -226,9 +226,9 @@ export default function CaseDetail() {
       <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
         
         {/* --- CASE HEADER --- */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+        <section className="bg-surface-lowest rounded-2xl shadow-sm border border-border-subtle p-8">
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Case Header</span>
+            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-[0.2em]">Case Header</span>
             
             <div className="flex flex-wrap items-center gap-4 mb-2">
               <h2 className="text-3xl font-extrabold text-[#1e293b] tracking-tight">
@@ -244,15 +244,15 @@ export default function CaseDetail() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-slate-500 font-medium">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-text-secondary font-medium">
               <div className="flex items-center gap-1.5">
-                <MapPin size={16} className="text-slate-400" />
+                <MapPin size={16} className="text-text-secondary" />
                 <span>{flag.district} · {flag.taluka || 'NLY'}</span>
               </div>
               <div className="w-1.5 h-1.5 rounded-full bg-slate-300 hidden sm:block"></div>
-              <div>Flag ID: <span className="text-slate-800 font-bold">{flag.flag_id}</span></div>
+              <div>Flag ID: <span className="text-text-primary font-bold">{flag.flag_id}</span></div>
               <div className="w-1.5 h-1.5 rounded-full bg-slate-300 hidden sm:block"></div>
-              <div>Status: <span className={`font-bold ${flag.status === 'OPEN' ? 'text-blue-600' : 'text-slate-800'}`}>{flag.status || 'OPEN'}</span></div>
+              <div>Status: <span className={`font-bold ${flag.status === 'OPEN' ? 'text-blue-600' : 'text-text-primary'}`}>{flag.status || 'OPEN'}</span></div>
             </div>
           </div>
         </section>
@@ -264,13 +264,13 @@ export default function CaseDetail() {
           <div className="lg:col-span-9 flex flex-col gap-6">
             
             {/* EVIDENCE DOSSIER */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-surface-lowest rounded-2xl shadow-sm border border-border-subtle overflow-hidden">
               <div className="bg-[#0f172a] px-6 py-4 flex items-center justify-between">
                 <h3 className="text-white font-bold text-sm tracking-wide">Case Evidence</h3>
                 <button
                   onClick={handleGenerateAIEvidence}
                   disabled={aiLoading || evidenceSource === 'ai'}
-                  className="bg-white text-[#0f172a] px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-100 transition-all disabled:opacity-50 flex items-center gap-2"
+                  className="bg-surface-lowest text-[#0f172a] px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-surface transition-all disabled:opacity-50 flex items-center gap-2"
                 >
                   {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   {aiLoading ? 'Analyzing...' : 'Generate AI Evidence'}
@@ -278,19 +278,19 @@ export default function CaseDetail() {
               </div>
               <div className="p-8">
                 <div className="mb-8">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Evidence Summary</h4>
+                  <h4 className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-4">Evidence Summary</h4>
                   <ul className="space-y-4">
                     {evidenceBullets.map((bullet, idx) => (
                       <li key={idx} className="flex items-start gap-3">
                         <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-300 flex-shrink-0"></div>
-                        <p className="text-slate-600 text-sm leading-relaxed">{bullet}</p>
+                        <p className="text-text-secondary text-sm leading-relaxed">{bullet}</p>
                       </li>
                     ))}
                   </ul>
                 </div>
                 
                 <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Data Sources</h4>
+                  <h4 className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-4">Data Sources</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
                       { icon: CreditCard, label: 'Payment Ledger', color: 'bg-blue-50 text-blue-600' },
@@ -298,11 +298,11 @@ export default function CaseDetail() {
                       { icon: Landmark, label: 'U-DISE', color: 'bg-indigo-50 text-indigo-600' },
                       { icon: Fingerprint, label: 'Aadhaar Registry', color: 'bg-orange-50 text-orange-600' },
                     ].map((source, idx) => (
-                      <div key={idx} className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-100 hover:border-slate-200 transition-colors group">
+                      <div key={idx} className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border-subtle hover:border-border-subtle transition-colors group">
                         <div className={`p-2 rounded-lg ${source.color} transition-transform group-hover:scale-110`}>
                           <source.icon size={20} />
                         </div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">{source.label}</span>
+                        <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wide">{source.label}</span>
                       </div>
                     ))}
                   </div>
@@ -311,16 +311,16 @@ export default function CaseDetail() {
             </div>
 
             {/* DATA RECORDS (NEW POSITION & STYLE) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Data Records</h3>
+            <div className="bg-surface-lowest rounded-2xl shadow-sm border border-border-subtle p-8">
+              <h3 className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-6">Data Records</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100/50">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 block mb-2">Payment Amount</span>
-                  <div className="text-2xl font-black text-slate-800 tracking-tight">₹{flag.payment_amount?.toLocaleString('en-IN') || 0}</div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary block mb-2">Payment Amount</span>
+                  <div className="text-2xl font-black text-text-primary tracking-tight">₹{flag.payment_amount?.toLocaleString('en-IN') || 0}</div>
                 </div>
                 <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100/50">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 block mb-2">Disbursement Date</span>
-                  <div className="text-2xl font-black text-slate-800 tracking-tight">{flag.payment_date || '2024-08-25'}</div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary block mb-2">Disbursement Date</span>
+                  <div className="text-2xl font-black text-text-primary tracking-tight">{flag.payment_date || '2024-08-25'}</div>
                 </div>
               </div>
             </div>
@@ -330,11 +330,11 @@ export default function CaseDetail() {
           {/* --- ACTION PANEL (COL 10-12) --- */}
           <div className="lg:col-span-3 space-y-6">
 
-            <div className="bg-slate-100/80 rounded-2xl border border-slate-200 p-6">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Action Panel</h3>
+            <div className="bg-surface/80 rounded-2xl border border-border-subtle p-6">
+              <h3 className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-4">Action Panel</h3>
               
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200 mb-6 flex flex-col items-center">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Risk Assessment</h4>
+              <div className="bg-surface-lowest rounded-xl p-4 shadow-sm border border-border-subtle mb-6 flex flex-col items-center">
+                <h4 className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2">Risk Assessment</h4>
                 <RiskGauge score={flag.risk_score} label={flag.risk_label} />
               </div>
 
@@ -363,26 +363,26 @@ export default function CaseDetail() {
                   <Info size={16} className="text-blue-600" />
                   <h4 className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Recommended Action</h4>
                 </div>
-                <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                <p className="text-sm text-text-secondary leading-relaxed font-medium">
                   {flag.recommended_action || "Freeze payment immediately. Initiate recovery proceedings. Refer to District Collector."}
                 </p>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Status Management</h4>
+                  <h4 className="text-[10px] font-black text-text-secondary uppercase tracking-widest mb-2 px-1">Status Management</h4>
                   <div className="relative">
                     <select 
                       value={selectedStatus} 
                       onChange={(e) => setSelectedStatus(e.target.value)}
-                      className="w-full appearance-none bg-white border border-slate-200 text-slate-800 text-sm font-bold rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-primary-override/20 focus:border-primary-override transition-all"
+                      className="w-full appearance-none bg-surface-lowest border border-border-subtle text-text-primary text-sm font-bold rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-primary-override/20 focus:border-primary-override transition-all"
                     >
                       <option value="OPEN">OPEN - Pending Review</option>
                       <option value="ASSIGNED">ASSIGNED - Field Investigation</option>
                       <option value="ASSIGNED_TO_VERIFIER">ASSIGNED TO VERIFIER</option>
                       <option value="RESOLVED">RESOLVED - Case Closed</option>
                     </select>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-secondary">
                       <ChevronRight size={16} className="rotate-90" />
                     </div>
                   </div>
@@ -407,18 +407,18 @@ export default function CaseDetail() {
       {showAssignModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100]" onClick={() => setShowAssignModal(false)}>
           <div
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200"
+            className="bg-surface-lowest rounded-3xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden border border-border-subtle animate-in fade-in zoom-in duration-200"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal header */}
-            <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="px-8 py-6 border-b border-border-subtle bg-surface-low/50 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-slate-800">Assign to Scheme Verifier</h2>
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">
+                <h2 className="text-xl font-bold text-text-primary">Assign to Scheme Verifier</h2>
+                <p className="text-xs text-text-secondary font-bold uppercase tracking-widest mt-1">
                   Case {flagId} · District Officers
                 </p>
               </div>
-              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors text-slate-400">
+              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors text-text-secondary">
                 <X size={20} />
               </button>
             </div>
@@ -430,18 +430,18 @@ export default function CaseDetail() {
                   <div className="w-20 h-20 rounded-3xl bg-emerald-50 flex items-center justify-center mx-auto mb-6 shadow-sm">
                     <Check size={40} className="text-emerald-600" />
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-800 mb-2">Successfully Assigned</h3>
-                  <p className="text-slate-500 font-medium">
-                    The case has been forwarded to <span className="text-slate-800 font-bold">{assignSuccess.name}</span>
+                  <h3 className="text-2xl font-bold text-text-primary mb-2">Successfully Assigned</h3>
+                  <p className="text-text-secondary font-medium">
+                    The case has been forwarded to <span className="text-text-primary font-bold">{assignSuccess.name}</span>
                   </p>
                 </div>
               ) : loadingVerifiers ? (
                 <div className="p-12 flex flex-col items-center justify-center gap-4">
                   <Loader2 size={32} className="animate-spin text-primary-override" />
-                  <span className="text-sm text-slate-400 font-bold uppercase tracking-widest">Finding available verifiers...</span>
+                  <span className="text-sm text-text-secondary font-bold uppercase tracking-widest">Finding available verifiers...</span>
                 </div>
               ) : verifiers.length === 0 ? (
-                <div className="p-12 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">
+                <div className="p-12 text-center text-text-secondary font-bold uppercase tracking-widest text-xs">
                   No verifiers found for your district.
                 </div>
               ) : (
@@ -449,32 +449,32 @@ export default function CaseDetail() {
                   {verifiers.map(v => (
                     <div
                       key={v.officer_id}
-                      className="px-6 py-4 flex items-center gap-4 hover:bg-slate-50 transition-all rounded-2xl group cursor-pointer"
+                      className="px-6 py-4 flex items-center gap-4 hover:bg-surface-low transition-all rounded-2xl group cursor-pointer"
                       onClick={() => handleAssign(v)}
                     >
                       {/* Avatar */}
-                      <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-primary-override/10 transition-colors">
-                        <span className="text-slate-600 font-bold group-hover:text-primary-override transition-colors">
+                      <div className="w-12 h-12 rounded-2xl bg-surface flex items-center justify-center flex-shrink-0 group-hover:bg-primary-override/10 transition-colors">
+                        <span className="text-text-secondary font-bold group-hover:text-primary-override transition-colors">
                           {v.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'SV'}
                         </span>
                       </div>
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{v.name}</p>
+                        <p className="text-sm font-bold text-text-primary truncate">{v.name}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                          <span className="flex items-center gap-1 text-[10px] text-text-secondary font-bold uppercase tracking-wider">
                             <MapPin size={10} /> {v.taluka}
                           </span>
                           <span className="text-slate-200">·</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{v.district}</span>
+                          <span className="text-[10px] text-text-secondary font-bold uppercase tracking-wider">{v.district}</span>
                         </div>
                       </div>
 
                       {/* Active cases badge */}
                       <div className="text-center flex-shrink-0 px-4">
-                        <p className="text-lg font-black text-slate-800">{v.active_cases ?? 0}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Active</p>
+                        <p className="text-lg font-black text-text-primary">{v.active_cases ?? 0}</p>
+                        <p className="text-[10px] text-text-secondary font-bold uppercase tracking-widest">Active</p>
                       </div>
 
                       {/* Assign arrow */}
@@ -493,12 +493,12 @@ export default function CaseDetail() {
       {/* ── AI Analysis Modal ── */}
       {showAIModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center z-[110] p-4 animate-in fade-in duration-300">
-          <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 animate-in zoom-in-95 slide-in-from-bottom-4 duration-500">
+          <div className="bg-surface-lowest rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden border border-border-subtle animate-in zoom-in-95 slide-in-from-bottom-4 duration-500">
             {/* Modal Header */}
             <div className="bg-[#0f172a] px-10 py-8 relative">
               <button 
                 onClick={() => setShowAIModal(false)}
-                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                className="absolute top-6 right-6 p-2 bg-surface-lowest/10 hover:bg-surface-lowest/20 rounded-full text-white transition-colors"
               >
                 <X size={20} />
               </button>
@@ -509,7 +509,7 @@ export default function CaseDetail() {
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-white tracking-tight">AI Intelligence Report</h3>
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-0.5">Automated Investigative Analysis</p>
+                  <p className="text-text-secondary text-xs font-bold uppercase tracking-widest mt-0.5">Automated Investigative Analysis</p>
                 </div>
               </div>
             </div>
@@ -517,18 +517,18 @@ export default function CaseDetail() {
             {/* Modal Body */}
             <div className="p-10">
               <div className="flex items-center gap-3 mb-6">
-                <div className="h-px flex-1 bg-slate-100"></div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Generated Evidence</span>
-                <div className="h-px flex-1 bg-slate-100"></div>
+                <div className="h-px flex-1 bg-surface"></div>
+                <span className="text-[10px] font-black text-text-secondary uppercase tracking-[0.2em]">Generated Evidence</span>
+                <div className="h-px flex-1 bg-surface"></div>
               </div>
 
               <div className="space-y-4">
                 {evidenceBullets.map((bullet, idx) => (
-                  <div key={idx} className="flex items-start gap-4 p-5 rounded-2xl bg-slate-50 border border-slate-100 animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                    <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <div key={idx} className="flex items-start gap-4 p-5 rounded-2xl bg-surface-low border border-border-subtle animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                    <div className="w-8 h-8 rounded-full bg-surface-lowest border border-border-subtle flex items-center justify-center flex-shrink-0 shadow-sm">
                       <Check size={14} className="text-emerald-500" />
                     </div>
-                    <p className="text-slate-700 text-sm font-medium leading-relaxed mt-1">{bullet}</p>
+                    <p className="text-text-secondary text-sm font-medium leading-relaxed mt-1">{bullet}</p>
                   </div>
                 ))}
               </div>
