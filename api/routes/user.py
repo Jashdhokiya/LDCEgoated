@@ -478,7 +478,7 @@ async def contact_support(
 ):
     """Creates a support ticket for the DFO."""
     uid = user["sub"]
-    db = get_db()
+    db = _get_db()
     
     # Fetch user details to get the latest district and name
     user_doc = db["users"].find_one({"user_id": uid})
@@ -499,3 +499,15 @@ async def contact_support(
     
     col.insert_one(ticket)
     return {"status": "success"}
+
+@router.get("/support")
+async def get_support_tickets(
+    user: dict = Depends(require_role("USER"))
+):
+    """Retrieves all support tickets for the current user."""
+    uid = user["sub"]
+    col = _col("support_tickets")
+    docs = list(col.find({"user_id": uid}).sort("created_at", -1))
+    for d in docs:
+        d["_id"] = str(d["_id"])
+    return docs

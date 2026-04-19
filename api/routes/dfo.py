@@ -234,7 +234,9 @@ async def get_support_tickets(user: dict = Depends(require_role("DFO"))):
             }
         },
         {
-            "$match": {} # Debug: district filter disabled
+            "$match": { 
+                "district": { "$regex": f"^{district}$", "$options": "i" } 
+            } if district else {}
         },
         {
             "$sort": { "created_at": -1 }
@@ -247,3 +249,39 @@ async def get_support_tickets(user: dict = Depends(require_role("DFO"))):
         if "user_info" in d: 
             del d["user_info"]
     return docs
+
+from bson.objectid import ObjectId
+
+@router.patch("/support-tickets/{ticket_id}")
+async def update_support_ticket(
+    ticket_id: str,
+    body: dict,
+    user: dict = Depends(require_role("DFO"))
+):
+    """Updates a support ticket (e.g., status)."""
+    col = _col("support_tickets")
+    
+    update_data = {}
+    if "status" in body:
+        update_data["status"] = body["status"]
+    
+    if "response" in body:
+        update_data["response"] = body["response"]
+        from datetime import datetime
+        update_data["responded_at"] = datetime.utcnow().isoformat()
+        if "status" not in update_data:
+            update_data["status"] = "RESOLVED" # Auto-resolve on response
+        
+    if not update_data:
+        raise HTTPException(400, "No valid fields to update")
+        
+    try:
+        result = col.update_one(
+            {"_id": ObjectId(ticket_id)},
+            {"$set": update_data}
+        )
+        if result.matched_count == 0:
+            raise HTTPException(404, "Ticket not found")
+        return {"status": "success", "message": "Ticket updated"}
+    except Exception as e:
+        raise HTTPException(400, f"Invalid ticket ID or update failed: {str(e)}")

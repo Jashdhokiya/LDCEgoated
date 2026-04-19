@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, MapPin, CreditCard, X, Loader2, Check, XCircle, TrendingUp } from 'lucide-react'
-import { getUser, faceVerifyKYC, completeKYC, uploadFaceReference, updateBank, getUserAnnouncements, contactSupport } from '../../api'
+import { CheckCircle, Clock, AlertTriangle, FileCheck, ChevronRight, RefreshCw, Shield, Camera, User, Phone, Mail, MapPin, CreditCard, X, Loader2, Check, XCircle, TrendingUp } from 'lucide-react'
+import { getUser, faceVerifyKYC, completeKYC, uploadFaceReference, updateBank, getUserAnnouncements, contactSupport, getUserSupportTickets } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 import WebcamCapture from '../../components/WebcamCapture'
 
@@ -312,10 +312,23 @@ function BankUpdateModal({ user, onClose, onUpdate }) {
 
 function SupportModal({ onClose }) {
   const { t } = useLanguage()
+  const [view, setView] = useState('list') // 'list' | 'new'
   const [loading, setLoading] = useState(false)
+  const [tickets, setTickets] = useState([])
+  const [fetchingTickets, setFetchingTickets] = useState(true)
   const [formData, setFormData] = useState({ subject: '', message: '' })
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (view === 'list') {
+      setFetchingTickets(true)
+      getUserSupportTickets().then(res => {
+        setTickets(res || [])
+        setFetchingTickets(false)
+      })
+    }
+  }, [view])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -328,7 +341,11 @@ function SupportModal({ onClose }) {
     try {
       await contactSupport(formData)
       setSuccess(true)
-      setTimeout(onClose, 2000)
+      setTimeout(() => {
+        setSuccess(false)
+        setFormData({ subject: '', message: '' })
+        setView('list')
+      }, 2000)
     } catch (err) {
       setError('Failed to send message. Please try again.')
     } finally {
@@ -338,60 +355,117 @@ function SupportModal({ onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-surface-lowest rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-surface-low">
+      <div className="bg-surface-lowest rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[80vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-surface-low shrink-0">
           <div className="flex items-center gap-3">
-            <Phone size={20} className="text-emerald-500" />
-            <h2 className="font-bold text-text-primary font-sans text-sm">Contact DFO Office</h2>
+            <Mail size={20} className="text-emerald-500" />
+            <h2 className="font-bold text-text-primary font-sans text-sm">
+              {view === 'list' ? 'Support Hub' : 'Contact DFO Office'}
+            </h2>
           </div>
           <button onClick={onClose} className="text-text-secondary hover:text-text-primary transition-colors"><X size={18} /></button>
         </div>
 
-        {success ? (
-          <div className="p-12 flex flex-col items-center text-center animate-in zoom-in duration-300">
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle size={32} className="text-emerald-600" />
+        <div className="overflow-y-auto overflow-x-hidden flex-1">
+          {view === 'list' ? (
+            <div className="p-6">
+              {fetchingTickets ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <Loader2 size={24} className="animate-spin text-emerald-500" />
+                  <p className="text-xs text-text-secondary font-data">Loading requests...</p>
+                </div>
+              ) : tickets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <MessageSquare size={32} className="text-text-tertiary mb-3" />
+                  <p className="text-sm font-bold text-text-primary">No Requests Yet</p>
+                  <p className="text-xs text-text-secondary mt-1">You haven't contacted the DFO office yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {tickets.map(t => (
+                    <div key={t._id} className="p-4 bg-surface-low border border-border-subtle rounded-xl">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-bold text-sm text-text-primary">{t.subject}</h4>
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${
+                          t.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {t.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary mb-3">{t.message}</p>
+                      
+                      {t.response && (
+                        <div className="mt-3 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                          <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-1">DFO Response</p>
+                          <p className="text-xs text-emerald-900">{t.response}</p>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-text-tertiary font-data mt-3 text-right">
+                        {new Date(t.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <h3 className="text-lg font-bold text-text-primary mb-2">Message Sent!</h3>
-            <p className="text-sm text-text-secondary">Your request has been forwarded to the DFO. They will review it shortly.</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {error && <div className="p-3 bg-risk-critical/10 text-risk-critical text-xs font-bold rounded-lg border border-risk-critical/20">{error}</div>}
-            
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase tracking-wider font-data">Subject</label>
-              <input
-                type="text"
-                className="w-full bg-surface-low border border-border-subtle rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
-                placeholder="Brief reason for contact"
-                value={formData.subject}
-                onChange={e => setFormData({ ...formData, subject: e.target.value })}
-              />
+          ) : success ? (
+            <div className="p-12 flex flex-col items-center text-center animate-in zoom-in duration-300">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle size={32} className="text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-bold text-text-primary mb-2">Message Sent!</h3>
+              <p className="text-sm text-text-secondary">Your request has been forwarded to the DFO. They will review it shortly.</p>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              {error && <div className="p-3 bg-risk-critical/10 text-risk-critical text-xs font-bold rounded-lg border border-risk-critical/20">{error}</div>}
+              
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase tracking-wider font-data">Subject</label>
+                <input
+                  type="text"
+                  className="w-full bg-surface-lowest border border-border-subtle rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                  placeholder="Brief reason for contact"
+                  value={formData.subject}
+                  onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-text-secondary uppercase tracking-wider font-data">Message</label>
-              <textarea
-                className="w-full bg-surface-low border border-border-subtle rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all h-32 resize-none"
-                placeholder="Describe your issue in detail..."
-                value={formData.message}
-                onChange={e => setFormData({ ...formData, message: e.target.value })}
-              />
-            </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-text-secondary uppercase tracking-wider font-data">Message</label>
+                <textarea
+                  className="w-full bg-surface-lowest border border-border-subtle rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all h-32 resize-none"
+                  placeholder="Describe your issue in detail..."
+                  value={formData.message}
+                  onChange={e => setFormData({ ...formData, message: e.target.value })}
+                />
+              </div>
+            </form>
+          )}
+        </div>
 
-            <div className="pt-4 flex gap-3">
-              <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-low transition-all">Cancel</button>
+        <div className="p-4 border-t border-border-subtle bg-surface-low shrink-0 flex gap-3">
+          {view === 'list' ? (
+            <button 
+              onClick={() => setView('new')}
+              className="w-full py-2.5 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 transition-all"
+            >
+              Compose New Message
+            </button>
+          ) : !success && (
+            <>
+              <button type="button" onClick={() => setView('list')} className="flex-1 py-2.5 border border-border-subtle text-sm font-semibold text-text-secondary rounded-xl hover:bg-surface-lowest transition-all">Back</button>
               <button 
-                type="submit"
+                type="button"
+                onClick={handleSubmit}
                 disabled={loading}
-                className="flex-1 py-2.5 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-emerald-500 text-white text-sm font-bold rounded-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
               >
                 {loading ? <Loader2 size={14} className="animate-spin" /> : 'Send Message'}
               </button>
-            </div>
-          </form>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -465,6 +539,7 @@ export default function UserDashboard() {
   const [readNews, setReadNews] = useState(new Set())
   const [expandedNews, setExpandedNews] = useState(new Set())
   const [announcements, setAnnouncements] = useState([])
+  const [supportTickets, setSupportTickets] = useState([])
 
   useEffect(() => {
     getUser().then(data => {
@@ -473,6 +548,9 @@ export default function UserDashboard() {
     })
     getUserAnnouncements().then(res => {
       setAnnouncements(res.announcements || [])
+    })
+    getUserSupportTickets().then(res => {
+      setSupportTickets(res || [])
     })
   }, [])
 
@@ -694,16 +772,21 @@ export default function UserDashboard() {
             },
             { 
               label: t('userDashboard.contactDFO'), 
-              icon: Phone, 
+              icon: Mail, 
               color: 'text-emerald-500', 
               bg: 'bg-tint-emerald', 
               desc: 'Get support',
               onClick: () => setShowSupportModal(true),
               extra: (
-                <div className="mt-4 p-3 bg-surface-low rounded-2xl border border-border-subtle/50">
-                  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Helpline</p>
-                  <p className="text-sm font-bold text-text-primary">+91 79 232 51900</p>
-                  <p className="text-xs text-text-secondary">Mon-Fri · 10:00 - 18:00</p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <div className="p-3 bg-yellow-50 rounded-2xl border border-yellow-100 flex flex-col items-center justify-center text-center">
+                    <p className="text-xl font-bold text-yellow-600 mb-0.5">{supportTickets.filter(t => t.status === 'OPEN').length}</p>
+                    <p className="text-[10px] font-bold text-yellow-700 uppercase tracking-widest">Open</p>
+                  </div>
+                  <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center text-center">
+                    <p className="text-xl font-bold text-emerald-600 mb-0.5">{supportTickets.filter(t => t.status === 'RESOLVED').length}</p>
+                    <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Resolved</p>
+                  </div>
                 </div>
               )
             },

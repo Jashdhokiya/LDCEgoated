@@ -183,6 +183,7 @@ export default function Login() {
           {/* ── STEP: Choose account type ──────────────────────────────── */}
           {step === 'choose' && (
             <>
+              <BackButton onClick={() => navigate('/')} />
               <div className="mb-8">
                 <h2 className="login-heading text-3xl font-bold text-text-primary tracking-tight">{t('login.welcome')}</h2>
                 <p className="text-sm text-text-secondary mt-1 font-data">{t('login.chooseAccountType')}</p>

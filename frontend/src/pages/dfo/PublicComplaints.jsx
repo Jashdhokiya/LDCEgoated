@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { MessageSquare, Clock, User, MapPin, ChevronRight, CheckCircle, Search, Filter, AlertCircle, Loader2 } from 'lucide-react'
-import { getSupportTickets } from '../../api'
+import { MessageSquare, Clock, User, MapPin, ChevronRight, CheckCircle, Search, Filter, AlertCircle, Loader2, X } from 'lucide-react'
+import { getSupportTickets, updateSupportTicket } from '../../api'
 import { useLanguage } from '../../i18n/LanguageContext'
 
 export default function PublicComplaints() {
@@ -9,14 +9,62 @@ export default function PublicComplaints() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filter, setFilter] = useState('ALL') // ALL, OPEN, RESOLVED
+  const [updatingId, setUpdatingId] = useState(null)
+  
+  // Response Modal State
+  const [respondComplaint, setRespondComplaint] = useState(null)
+  const [responseText, setResponseText] = useState('')
+  const [isSending, setIsSending] = useState(false)
 
-  useEffect(() => {
+  const fetchTickets = () => {
     getSupportTickets().then(res => {
       console.log('Complaints received:', res)
       setComplaints(res || [])
       setLoading(false)
     })
+  }
+
+  useEffect(() => {
+    fetchTickets()
   }, [])
+
+  const handleResolve = async (id) => {
+    setUpdatingId(id)
+    try {
+      await updateSupportTicket(id, { status: 'RESOLVED' })
+      setComplaints(prev => prev.map(c => c._id === id ? { ...c, status: 'RESOLVED' } : c))
+    } catch (err) {
+      console.error('Failed to update ticket', err)
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleRespond = (complaint) => {
+    setRespondComplaint(complaint)
+    setResponseText(complaint.response || '')
+  }
+
+  const submitResponse = async () => {
+    if (!responseText.trim() || !respondComplaint) return
+    setIsSending(true)
+    try {
+      await updateSupportTicket(respondComplaint._id, { 
+        response: responseText,
+        status: 'RESOLVED' 
+      })
+      setComplaints(prev => prev.map(c => 
+        c._id === respondComplaint._id 
+          ? { ...c, response: responseText, status: 'RESOLVED' } 
+          : c
+      ))
+      setRespondComplaint(null)
+    } catch (err) {
+      console.error('Failed to send response', err)
+    } finally {
+      setIsSending(false)
+    }
+  }
 
   const filtered = complaints.filter(c => {
     const matchesSearch = c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -115,23 +163,88 @@ export default function PublicComplaints() {
                       <p className="text-[10px] text-text-secondary uppercase tracking-wider">District</p>
                     </div>
                   </div>
+                  
+                  {complaint.response && (
+                    <div className="mt-4 p-3 bg-primary-override/5 rounded-lg border border-primary-override/10">
+                      <p className="text-xs font-bold text-primary-override mb-1">DFO Response:</p>
+                      <p className="text-sm text-text-secondary">{complaint.response}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="md:w-48 flex flex-col justify-center gap-3">
-                <button className="w-full py-2.5 bg-primary-override text-white text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => handleRespond(complaint)}
+                  className="w-full py-2.5 bg-primary-override text-white text-xs font-bold rounded-xl hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                >
                   <ChevronRight size={14} />
                   Respond
                 </button>
-                <button className="w-full py-2.5 border border-border-subtle text-xs font-bold text-text-secondary rounded-xl hover:bg-surface-low transition-all flex items-center justify-center gap-2">
-                  <CheckCircle size={14} />
-                  Mark Resolved
-                </button>
+                {complaint.status !== 'RESOLVED' && (
+                  <button 
+                    onClick={() => handleResolve(complaint._id)}
+                    disabled={updatingId === complaint._id}
+                    className="w-full py-2.5 border border-border-subtle text-xs font-bold text-text-secondary rounded-xl hover:bg-surface-low transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {updatingId === complaint._id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                    Mark Resolved
+                  </button>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Response Modal */}
+      {respondComplaint && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-border-subtle flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-text-primary">Respond to Citizen</h3>
+                <p className="text-sm text-text-secondary mt-1">Ticket: {respondComplaint.subject}</p>
+              </div>
+              <button 
+                onClick={() => setRespondComplaint(null)}
+                className="w-8 h-8 rounded-full hover:bg-surface-low flex items-center justify-center text-text-tertiary transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <label className="block text-sm font-semibold text-text-primary mb-2">
+                Your Message
+              </label>
+              <textarea
+                value={responseText}
+                onChange={(e) => setResponseText(e.target.value)}
+                placeholder="Type your response here. This will be visible to the citizen and will automatically resolve the ticket."
+                className="w-full h-32 p-3 rounded-xl border border-border-subtle bg-surface-low focus:bg-white focus:ring-2 focus:ring-primary-override/20 focus:border-primary-override transition-all outline-none resize-none text-sm"
+              />
+            </div>
+            
+            <div className="p-4 border-t border-border-subtle bg-surface-low flex justify-end gap-3">
+              <button
+                onClick={() => setRespondComplaint(null)}
+                className="px-5 py-2.5 text-sm font-semibold text-text-secondary hover:bg-white rounded-xl transition-colors border border-transparent hover:border-border-subtle"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitResponse}
+                disabled={isSending || !responseText.trim()}
+                className="px-5 py-2.5 text-sm font-bold text-white bg-primary-override rounded-xl hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSending ? <Loader2 size={16} className="animate-spin" /> : <MessageSquare size={16} />}
+                Send & Resolve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

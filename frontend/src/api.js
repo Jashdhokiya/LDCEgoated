@@ -215,6 +215,10 @@ export async function getSupportTickets() {
   return safe(() => client.get('/api/dfo/support-tickets'), [])
 }
 
+export async function updateSupportTicket(ticketId, data) {
+  return safe(() => client.patch(`/api/dfo/support-tickets/${ticketId}`, data), null)
+}
+
 export async function getStudents(params = {}) {
   return safe(() => client.get('/api/dfo/students', { params }), { total: 0, students: [] })
 }
@@ -358,6 +362,10 @@ export async function getUserAnnouncements() {
 
 export async function contactSupport(payload) {
   return safe(() => client.post('/api/user/support', payload), null)
+}
+
+export async function getUserSupportTickets() {
+  return safe(() => client.get('/api/user/support'), [])
 }
 
 export async function renewKYC() {

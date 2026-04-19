@@ -67,7 +67,7 @@ function PublicRoute({ children }) {
 function ProtectedLayout() {
   const { role, officer, logout, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!role) return <Navigate to="/login" replace />
+  if (!role) return <Navigate to="/" replace />
 
   // If USER and profile not complete, force profile completion
   if (role === 'USER' && !officer?.profile_complete) {
@@ -88,7 +88,7 @@ function ProtectedLayout() {
 function ProfileCompletionGuard({ children }) {
   const { role, officer, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!role) return <Navigate to="/login" replace />
+  if (!role) return <Navigate to="/" replace />
   // If profile is already complete, go to dashboard
   if (role === 'USER' && officer?.profile_complete) {
     return <Navigate to="/user/dashboard" replace />
